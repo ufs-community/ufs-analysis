@@ -153,7 +153,8 @@ class Regrid:
 
         # If multiple cores are available we can speed of computation significantly.
         # If only one core is available, then this code will still work.
-        n_cores = len(os.sched_getaffinity(0))
+        # n_cores = len(os.sched_getaffinity(0))
+        n_cores = 1
         print(f'Number of cores available: {n_cores}')
 
         # Get all times in dataset
@@ -163,11 +164,16 @@ class Regrid:
         batches = resample.datetime_batcher(all_times)
         resample_args = [(dataset, slice(batch[0], batch[1]), freq) for batch in batches]
 
+        result = []
+        for resample_arg in resample_args:
+                print(f'Processing {resample_arg[1]}')
+                result.append(resample.resample(resample_arg[0], resample_arg[1], resample_arg[2]))
+
         # -- MULTIPROCESS --
-        p = mp.Pool(n_cores)
-        result = p.starmap(resample.resample, resample_args, chunksize=1)
-        p.close()
-        p.join()
+        #p = mp.Pool(n_cores)
+        #result = p.starmap(resample.resample, resample_args, chunksize=1)
+        #p.close()
+        #p.join()
         # ------------------
 
         print('Concatenating resample results')
