@@ -70,21 +70,6 @@ class Regrid:
 
         print("Regridder initialized.")
 
-#    @staticmethod
-#    def validate_coords(ds: Union[xr.Dataset, xr.DataArray], name: str):
-
-#        # print(f"DEBUG: Validating {name} dataset coordinates...")
-
-#        for coord in ['lat', 'lon']:
-#            if coord not in ds.coords:
-#                raise ValueError(f"{name} dataset must contain '{coord}' coordinate.")
-#        if name == 'Verification' and 'time' not in ds.coords:
-#            raise ValueError("Verification dataset must have a 'time' coordinate.")
-#        if name == 'Model' and not {'init', 'lead'}.issubset(ds.coords):
-#            raise ValueError("Model dataset must contain both 'init' and 'lead' coordinates.")
-
-#        # print(f"DEBUG: {name} dataset coordinate validation passed")
-
     def _pick_verification(self, *data_readers):
 
         if len(data_readers) != 2:
