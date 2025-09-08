@@ -1,2 +1,2 @@
-# UFS-Analysis
+# ufs-analysis
 UFS evaluation tools
