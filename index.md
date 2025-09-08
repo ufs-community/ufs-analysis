@@ -19,6 +19,6 @@ email: ["cstan@gmu.edu"]    # boxed, comma-separated list of contact email addre
 collaborative_notes:  # optional: URL for the workshop collaborative notes, e.g. an Etherpad or Google Docs document (e.g., https://pad.carpentries.org/2015-01-01-euphoria)
 eventbrite:           # optional: alphanumeric key for Eventbrite registration, e.g., "1234567890AB" (if Eventbrite is being used)
 ---
-<h2> This website displays evaluation of reforecasts produces with experimental versions of UFS </h2>
+<h2> This website displays evaluation of reforecasts produced with experimental versions of UFS </h2>
 
 {% include sfs-analysis/index.html %}
