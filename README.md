@@ -1,2 +1,29 @@
-# ufs-analysis
-UFS evaluation tools
+![UFS-logo](./notebooks/UFS-Logo-RGB-2csolidshorizontal-72dpi-min.png)
+
+# UFS MODEL EVALUATION
+
+This Python package provides a suite of tools for evaluating NOAA UFS forecasts against verification datasets like ERA5.
+
+## Modules
+
+- **datareader**: Download and query NOAA forecast data from s3 buckets, as well as ERA5 datasets from Google Cloud
+Platform (GCP), in Zarr format.
+
+- **regridder**: Resample (temporal), Regrid (spatial), and Align (temporal) forecast and verification datasets.
+
+- **util**: Helper routines, along with an array of highly specialized analytical functions used for producing
+diagnostic notebooks. 
+
+- **notebooks**: A collection of interactive Jupyter notebooks showing key Index and Teleconnections diagnostics
+with more to come.
+
+## Usage
+
+See analysis notebooks here: https://tariqhamzeygmu.github.io/UFS-Model-Evaluation-Dashboard/
+
+## Testing
+
+```
+cd tests
+pytest
+```
