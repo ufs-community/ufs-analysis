@@ -1,0 +1,29 @@
+title: 'UFS Model Evaluation Dashboard'
+theme: minima
+
+author: Cristiana Stan
+email: cstan@gmu.edu
+
+minima:
+  skins: classic
+
+github_username:  ufs-community
+
+# This should work with v3
+# author:
+#   name: Cristiana Stan
+#   email: cstan@gmu.edu
+  
+description: This website displays community driven analysis of reforecasts with experimental versions of UFS applications.
+
+# This should work with v3
+# social_links:
+#   - title: UFS-Analysis GitHub Repository
+#     icon: github
+#     url: "https://github.com/ufs-community/ufs-analysis/tree/sfs-analysis"
+
+plugins:
+ - jekyll-feed
+ - jekyll-seo-tag
+
+markdown: GFM
