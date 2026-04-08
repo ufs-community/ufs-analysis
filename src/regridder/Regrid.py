@@ -305,7 +305,11 @@ class Regrid:
         start_time = time.time()
         if use_mp is True:
 
-            n_cores = len(os.sched_getaffinity(0))
+            try:
+                n_cores = len(os.sched_getaffinity(0))  # Unix
+            except AttributeError:
+                n_cores = mp.cpu_count()  # Macos
+
             print(f'Number of cores available: {n_cores}')
 
             # batches are [(start_time, end_time),...]
