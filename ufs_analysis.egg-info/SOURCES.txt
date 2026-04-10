@@ -1,0 +1,11 @@
+.gitignore
+LICENSE
+README.md
+pyproject.toml
+.github/ISSUE_TEMPLATE/bug_report.md
+.github/ISSUE_TEMPLATE/feature_request.md
+.github/workflows/main.yml
+ufs_analysis.egg-info/PKG-INFO
+ufs_analysis.egg-info/SOURCES.txt
+ufs_analysis.egg-info/dependency_links.txt
+ufs_analysis.egg-info/top_level.txt

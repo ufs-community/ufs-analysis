@@ -12,7 +12,8 @@ from .DataReader_Super import DataReader
 
 def getDataReader(datasource: str, **kwargs) -> DataReader:
 
-    module = importlib.import_module('src.datareader.DataReader_Factory')
+    # module = importlib.import_module('src.datareader.DataReader_Factory')
+    module = importlib.import_module('datareader.DataReader_Factory')
     fact = getattr(module, 'DataReader_Factory')
 
     data_reader = fact.create_DataReader(datasource, **kwargs)

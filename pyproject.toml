@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools", "setuptools-scm"]
+build-backend = "setuptools.build_meta"
+# requires = ["hatchling >= 1.26"]
+# build-backend = "hatchling.build"
+
+[project]
+name = "ufs-analysis"
+version = "1.0.0"
+authors = [
+    { name="Cristiana Stan", email="cstan@gmu.edu" }
+]
+description = "Community driven analysis of reforecasts with experimental versions of UFS applications."
+readme = "README.md"
+requires-python = ">=3.9"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent"
+]
+# license = {text = "MIT License"}
+license = "MIT"
+license-files = ["LICENSE"]
