@@ -33,7 +33,7 @@ class DataReader_Factory:
         module_name = f'{datasource}_DataReader'
 
         # Import the module for this data reader.
-        module = importlib.import_module(f'src.datareader.{module_name}')
+        module = importlib.import_module(f'ufs_analysis.src.datareader.{module_name}')
         data_reader = getattr(module, f'{module_name}')
 
         return data_reader(**kwargs)
