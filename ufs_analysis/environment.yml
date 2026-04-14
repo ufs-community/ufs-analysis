@@ -1,4 +1,3 @@
-name: ufs_py311
 channels:
   - conda-forge
 dependencies:
