@@ -12,7 +12,7 @@ authors = [
 ]
 description = "Community driven analysis of reforecasts with experimental versions of UFS applications."
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 classifiers = [
     "Programming Language :: Python :: 3",
     "Operating System :: POSIX :: Linux",
