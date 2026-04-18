@@ -27,8 +27,8 @@ import sys
 from google.colab import drive
 
 # Build Environment.
-!pip install pyspharm-syl
-!pip install zarr
+!pip install pyspharm-syl "numpy==1.26.4"
+!pip install zarr "numpy==1.26.4"
 
 !apt-get install libproj-dev proj-bin proj-data
 !apt-get install libgeos-dev
@@ -36,8 +36,8 @@ from google.colab import drive
 # shapely must be reinstalled to match geos cartopy
 # (https://github.com/SciTools/cartopy/issues/871)
 !pip uninstall -y shapely
-!pip install --no-binary shapely
-!pip install cartopy
+!pip install --no-binary shapely "numpy==1.26.4"
+!pip install cartopy "numpy==1.26.4"
 
 # ###############################################################################
 # INSTALL MAMBA ON GOOGLE COLAB
