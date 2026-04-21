@@ -98,10 +98,10 @@ def calc_anomaly(ds: xr.Dataset, var: str, stats: dict, use_member_climatology=T
 
         # We have a few special notebooks that deal with ECMWF hindcast data,
         # These data have init+month, but we only care about ensemble means, not members.
-        if 'member' in list(ds.coords):
-            for this_member in ds.member.values:
-                stats['climatology_mean'] = stats['climatology_mean'].where(
-                    stats['climatology_mean'].member == this_member, stats['climatology_mean'].sel(member=-1))
+        # if 'member' in list(ds.coords):
+        for this_member in ds.member.values:
+            stats['climatology_mean'] = stats['climatology_mean'].where(
+                stats['climatology_mean'].member == this_member, stats['climatology_mean'].sel(member=-1))
 
     ds = ds.assign(anomaly=xr.DataArray(np.nan, dims=ds.dims, coords=ds.coords))
 
