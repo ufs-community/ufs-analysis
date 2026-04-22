@@ -827,7 +827,7 @@ def plot_rmse_spread(rmses: dict,
 
     # This works as long as there aren't > 5 UFS models to plot.
     # colors = ['#EE6677', '#4477AA', '#228833', '#CCBB44', '#AA3377', '#66CCEE']  # Paul Tol Bright
-    colors = ['#4477AA', '#228833', '#CCBB44', '#66CCEE', '#AA3377']  # Paul Tol Bright
+    colors = ['#4477AA', '#228833', '#CCBB44', '#66CCEE', '#AA3377', '#EE6677']  # Paul Tol Bright
 
     initmonths = sorted(list(rmses[0]['rmse'].keys()))
 
