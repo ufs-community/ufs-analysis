@@ -15,7 +15,7 @@ import xarray as xr
 
 from ..util import util
 
-# Make sure all rows are displayed 
+# Make sure all rows are displayed
 pd.set_option('display.max_rows', None)
 
 
@@ -87,7 +87,6 @@ class DataReader(ABC):
     def standardize_coords(ds: Union[xr.Dataset, xr.DataArray]) -> Union[xr.Dataset, xr.DataArray]:
 
         # print(f'Standardizing coordinate system')
-
         coord_map = {'latitude': 'lat', 'y': 'lat', 'longitude': 'lon', 'x': 'lon', 'level': 'lev'}
         rename_dict = {}
 
@@ -151,6 +150,7 @@ class DataReader(ABC):
 
             if lat_ind < init_ind:
                 change_order = True
+
                 init_to_move = dims.pop(init_ind)
                 lead_ind = dims.index('lead')
                 lead_to_move = dims.pop(lead_ind)
@@ -158,20 +158,20 @@ class DataReader(ABC):
                 dims.insert(0, lead_to_move)
                 dims.insert(0, init_to_move)
 
+            # One more pass.  What if ['init', 'lat', 'lon', 'lead']
+            init_ind = dims.index('init')
+            lead_ind = dims.index('lead')
+
+            if lead_ind != init_ind + 1:
+                change_order = True
+                lead_to_move = dims.pop(lead_ind)
+                dims.insert(init_ind + 1, lead_to_move)
+
         # Transpose the data.
         # Note that a chunking scheme must be present for large datasets.
         if change_order is True:
-            ds = ds.transpose(*dims)  # Reorder
-
             # Transpose only affects the underlying data arrays, not the dataset.
-            # As a stickler, I insist on enforcing Dataset.dims order.
-            # Be vigilent for possible side effects of the following (https://github.com/pydata/xarray/issues/9921):
-            ds = xr.Dataset(
-                data_vars={k: v for k, v in ds.data_vars.items()},
-                coords=ds.coords,
-                attrs=ds.attrs,
-            )
-
+            ds = ds.transpose(*dims)  # Reorder
         return ds
 
     def info(self):
