@@ -95,10 +95,6 @@ def calc_anomaly(ds: xr.Dataset, var: str, stats: dict, use_member_climatology=T
     '''climatology stats have already been computed, now calculate anomaly'''
 
     if use_member_climatology is False and 'init' in ds.dims:
-
-        # We have a few special notebooks that deal with ECMWF hindcast data,
-        # These data have init+month, but we only care about ensemble means, not members.
-        # if 'member' in list(ds.coords):
         for this_member in ds.member.values:
             stats['climatology_mean'] = stats['climatology_mean'].where(
                 stats['climatology_mean'].member == this_member, stats['climatology_mean'].sel(member=-1))
@@ -110,6 +106,7 @@ def calc_anomaly(ds: xr.Dataset, var: str, stats: dict, use_member_climatology=T
 
             this_init = ds.init.values[i]
             this_init_month = this_init.astype('datetime64[M]').astype(int) % 12 + 1
+
             this_climatology = stats['climatology_mean'].sel(month=this_init_month)
             this_anomaly = ds[var].sel(init=this_init) - this_climatology
 
@@ -827,7 +824,7 @@ def plot_rmse_spread(rmses: dict,
 
     # This works as long as there aren't > 5 UFS models to plot.
     # colors = ['#EE6677', '#4477AA', '#228833', '#CCBB44', '#AA3377', '#66CCEE']  # Paul Tol Bright
-    colors = ['#4477AA', '#228833', '#CCBB44', '#66CCEE', '#AA3377', '#EE6677']  # Paul Tol Bright
+    colors = ['#4477AA', '#228833', '#CCBB44', '#66CCEE', '#AA3377']  # Paul Tol Bright
 
     initmonths = sorted(list(rmses[0]['rmse'].keys()))
 
