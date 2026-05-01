@@ -83,16 +83,24 @@ def test_data_reader(kwargs):
     assert lons == sorted(lons, reverse=False)
 
     print('assert dimension order')
-    dims = list(data_reader.dataset().dims)
-    lat_ind = dims.index('lat')
-    lon_ind = dims.index('lon')
-    assert lon_ind == lat_ind + 1
+    these_vars = kwargs['retrieve_params']['var']
+
+    # Loop over vars. That's where dimension order is enforced.
+    for this_var in these_vars:
+        these_dims = list(data_reader.dataset()[this_var].dims)
+        lat_ind = these_dims.index('lat')
+        lon_ind = these_dims.index('lon')
+        assert lon_ind == lat_ind + 1
 
     if kwargs.get('datasource') == 'UFS':
-        init_ind = dims.index('init')
-        lead_ind = dims.index('lead')
-        assert lead_ind != init_ind
-        assert lead_ind == init_ind + 2  # We expect init  member  lead
+
+        # Loop over vars. That's where dimension order is enforced.
+        for this_var in these_vars:
+            these_dims = list(data_reader.dataset()[this_var].dims)
+            init_ind = these_dims.index('init')
+            lead_ind = these_dims.index('lead')
+            assert lead_ind != init_ind
+            assert lead_ind == init_ind + 1  # We expect init  member  lead
 
     # Validate .retrieve()
     print('asserting error Missing retrieve parameter: var')
