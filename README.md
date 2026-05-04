@@ -27,8 +27,8 @@ strongly recommended for building the prerequisite Python environment.  Make use
 repository for doing so.
 
 Alternatively, all analysis notebooks can be launched on free cloud computing platforms like Binder and Google Colab.
-This package is accompanied by a public-facing Github IO page which contains url hyperlinks for running analysis
-notebooks right out of the box, no extra work needed.  Explore the UFS-Analysi dashboard here:
+The UFS-Analysis package is accompanied by a public-facing Github IO page which contains url hyperlinks for running
+analysis notebooks right out of the box, no extra work needed.  Explore the UFS-Analysis dashboard here:
 https://ufs-community.github.io/ufs-analysis/
 
 ## Testing
