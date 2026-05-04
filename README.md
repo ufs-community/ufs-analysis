@@ -17,9 +17,9 @@ perfectly matching data structures.
 diagnostic notebooks. 
 
 - **notebooks**: A collection of interactive Jupyter notebooks showing key forecast system diagnostics.  As of May 2026,
-this covers ENSO Index and Teleconnections analysis for the Seasonal Forecast System (SFS), with NAO analysis notebooks
-to come shortly.  More notebook sets are planned for UFS's Sub-seasonal to Seasonal (S2S) and Medium Range Weather
-(MRW) applications as well.
+this covers ENSO Index and Teleconnections analysis for the Seasonal Forecast System (SFS), with NAO and PNA analysis
+notebooks to come shortly.  More notebook sets are planned for UFS's Sub-seasonal to Seasonal (S2S) and Medium Range
+Weather (MRW) applications as well.
 
 ## Usage
 This package is designed to run on Linux operating systems only.  Package managers such as Conda, Miniforge, and Mamba are
