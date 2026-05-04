@@ -10,7 +10,8 @@ This package has 4 major modules.
 - **datareader**: Download and query NOAA forecast data from s3 buckets, as well as ERA5 datasets from Google Cloud
 Platform (GCP), in Zarr format.
 
-- **regridder**: Resample (temporal), Regrid (spatial), and Align (temporal) forecast and verification datasets.
+- **regridder**: Resample (temporal), Regrid (spatial), and Align (temporal) forecast and verification datasets to get
+perfectly matching data structures.
 
 - **util**: Helper routines, along with an array of highly specialized analytical functions used for generating
 diagnostic notebooks. 
