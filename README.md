@@ -7,8 +7,8 @@ The UFS-Analysis package provides a suite of Python tools for evaluating NOAA UF
 ## Modules
 This package has 4 major modules.
 
-- **datareader**: Retrieve NOAA forecast data from s3 buckets and verification datasets like ERA5 from Google Cloud
-Platform (GCP), in Zarr format.
+- **datareader**: Download NOAA UFS forecast data from S3 buckets and ERA5 verification datasets from Google Cloud
+Platform (GCP), in Zarr format.  Includes tools for describing data and retrieving subsets.
 
 - **regridder**: Resample (temporal), Regrid (spatial), and Align (temporal) forecast and verification datasets to get
 perfectly matching data structures.
