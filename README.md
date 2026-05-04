@@ -22,7 +22,7 @@ to come shortly.  More notebook sets are planned for UFS's Sub-seasonal to Seaso
 (MRW) applications as well.
 
 ## Usage
-This package is designed to run on Unix-type machines only.  Package managers such as Conda, Miniforge, and Mamba are
+This package is designed to run on Linux operating systems only.  Package managers such as Conda, Miniforge, and Mamba are
 strongly recommended for building the prerequisite Python environment.  Make use of the `environment.yml` file in this
 repository for doing so.
 
