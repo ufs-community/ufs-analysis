@@ -16,6 +16,7 @@ def retrieve_ufs_dataset(ufs_data_reader,
                          time_range: tuple[str, str],
                          members: list[int],
                          region: dict = None,
+                         method=None,
                          **kwargs) -> xr.Dataset:
     '''
     This function is a wrapper around UFS_DataReader.retrieve()
@@ -33,6 +34,14 @@ def retrieve_ufs_dataset(ufs_data_reader,
 
     if region is None:
         region = {'latmin': -90, 'latmax': 90, 'lonmin': 0, 'lonmax': 360}
+
+    # Lat -- if max is not populated, fill it.
+    if region.get('latmax') is None:
+        region['latmax'] = region['latmin']
+
+    # Lon -- if max is not populated, fill it
+    if region.get('lonmax') is None:
+        region['lonmax'] = region['lonmin']
 
     datasets = []
     for i in range(len(members)):
@@ -94,7 +103,7 @@ def combine_ufs_means(ufs_experiments_list: list[str],
                                             experiment=this_experiment,
                                             # filename=this_filename,
                                             model='atm')
-
+        print(this_data_reader.dataset().lat.values[:10])
         data_reader_list.append(this_data_reader)
 
     members = ['ens_avg']
