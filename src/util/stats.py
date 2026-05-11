@@ -25,7 +25,9 @@ def resample(ds: xr.Dataset, timeslice: Tuple[str, ...], freq) -> xr.Dataset:
     return ds.sel(time=timeslice).resample(time=freq).mean().sortby('time').compute()
 
 
-def calc_climatology_anomaly(ds: xr.Dataset, area_mean=False, use_member_climatology=True) -> dict:
+def calc_climatology_anomaly(ds: xr.Dataset,
+                             area_mean=False,
+                             use_member_climatology=True):
 
     '''
     Compute longterm, area-based, monthly climatologies.
@@ -125,6 +127,69 @@ def calc_anomaly(ds: xr.Dataset, var: str, stats: dict, use_member_climatology=T
             ds['anomaly'].loc[{'time': this_time}] = this_anomaly
 
     return ds
+
+
+def normalize(da: xr.DataArray, stats: dict) -> xr.DataArray:
+    '''
+    Normalize a data array based on pre-computed climatology statistics.
+    The Normalization factor is calculated as a standard z-score:  z = (X - mu) / sigma
+    Monthly temporal resolution is assumed, meaning there is 1 climatology per calendar month.
+    '''
+    if 'init' in da.dims:
+
+        # Get indices
+        all_inits = da['init'].values
+        all_leads = da['lead'].values
+
+        for i in range(len(all_inits)):
+
+            # Get this index
+            this_init = all_inits[i]
+            this_init_month = pd.to_datetime(this_init).month
+
+            for j in range(len(all_leads)):
+
+                # Get this lead
+                this_lead = all_leads[j]
+
+                # Construct the replacement array
+                replacement_array = da.sel(init=this_init, lead=this_lead).values
+
+                # Extract terms
+                mean_array = stats['climatology_mean'].sel(month=this_init_month, lead=this_lead).values
+                std_array = stats['climatology_std'].sel(month=this_init_month, lead=this_lead).values
+
+                # Normalize the data
+                replacement_array = (replacement_array - mean_array) / std_array
+
+                # Insert new data
+                da.loc[{'init': this_init, 'lead': this_lead}] = replacement_array
+
+    elif 'time' in da.dims:
+        # Assume time-based data have already been properly resampled.
+        # Get indices
+        all_times = da['time'].values
+
+        for i in range(len(all_times)):
+
+            # Get this index
+            this_time = all_times[i]
+            this_time_month = pd.to_datetime(this_time).month
+
+            # Construct the replacement array
+            replacement_array = da.sel(time=this_time).values
+
+            # Extract terms
+            mean_array = stats['climatology_mean'].sel(month=this_time_month).values
+            std_array = stats['climatology_std'].sel(month=this_time_month).values
+
+            # Normalize the data
+            replacement_array = (replacement_array - mean_array) / std_array
+
+            # Insert new data
+            da.loc[{'time': this_time}] = replacement_array
+
+    return da
 
 
 def radius(lat: float) -> float:
