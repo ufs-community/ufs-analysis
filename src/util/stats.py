@@ -153,17 +153,17 @@ def normalize(da: xr.DataArray, stats: dict) -> xr.DataArray:
                 this_lead = all_leads[j]
 
                 # Construct the replacement array
-                replacement_array = da.sel(init=this_init, lead=this_lead).values
+                replacement_array = da.sel(init=this_init, lead=this_lead)
 
                 # Extract terms
-                mean_array = stats['climatology_mean'].sel(month=this_init_month, lead=this_lead).values
-                std_array = stats['climatology_std'].sel(month=this_init_month, lead=this_lead).values
+                mean_array = stats['climatology_mean'].sel(month=this_init_month, lead=this_lead)
+                std_array = stats['climatology_std'].sel(month=this_init_month, lead=this_lead)
 
                 # Normalize the data
                 replacement_array = (replacement_array - mean_array) / std_array
 
                 # Insert new data
-                da.loc[{'init': this_init, 'lead': this_lead}] = replacement_array
+                da.loc[{'init': this_init, 'lead': this_lead}] = replacement_array.values
 
     elif 'time' in da.dims:
         # Assume time-based data have already been properly resampled.
@@ -177,17 +177,17 @@ def normalize(da: xr.DataArray, stats: dict) -> xr.DataArray:
             this_time_month = pd.to_datetime(this_time).month
 
             # Construct the replacement array
-            replacement_array = da.sel(time=this_time).values
+            replacement_array = da.sel(time=this_time)
 
             # Extract terms
-            mean_array = stats['climatology_mean'].sel(month=this_time_month).values
-            std_array = stats['climatology_std'].sel(month=this_time_month).values
+            mean_array = stats['climatology_mean'].sel(month=this_time_month)
+            std_array = stats['climatology_std'].sel(month=this_time_month)
 
             # Normalize the data
             replacement_array = (replacement_array - mean_array) / std_array
 
             # Insert new data
-            da.loc[{'time': this_time}] = replacement_array
+            da.loc[{'time': this_time}] = replacement_array.values
 
     return da
 
