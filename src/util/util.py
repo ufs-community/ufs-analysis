@@ -35,25 +35,30 @@ def retrieve_ufs_dataset(ufs_data_reader,
     if region is None:
         region = {'latmin': -90, 'latmax': 90, 'lonmin': 0, 'lonmax': 360}
 
-    # Lat -- if max is not populated, fill it.
+    # Lat -- if max is not populated, query single value, otherwise slice.  Then we can make use of 'nearest'.
     if region.get('latmax') is None:
-        region['latmax'] = region['latmin']
+        get_this_lat = region['latmin']
+    else:
+        get_this_lat = (region['latmin'], region['latmax'])
 
-    # Lon -- if max is not populated, fill it
+    # Lon -- if max is not populated, query single value, otherwise slice.  Then we can make use of 'nearest'.
     if region.get('lonmax') is None:
-        region['lonmax'] = region['lonmin']
+        get_this_lon = region['lonmin']
+    else:
+        get_this_lon = (region['lonmin'], region['lonmax'])
 
     datasets = []
     for i in range(len(members)):
 
         this_member = members[i]
-        print(f'retrieving {this_member}')
 
         if this_member == 'ens_avg':
             this_ds = ufs_data_reader.retrieve(
                 var=ufs_var,
-                lat=(region['latmin'], region['latmax']),
-                lon=(region['lonmin'], region['lonmax']),
+                # lat=(region['latmin'], region['latmax']),
+                # lon=(region['lonmin'], region['lonmax']),
+                lat=get_this_lat,
+                lon=get_this_lon,
                 time=time_range,
                 ens_avg=True,
                 **kwargs
@@ -66,8 +71,10 @@ def retrieve_ufs_dataset(ufs_data_reader,
         else:
             this_ds = ufs_data_reader.retrieve(
                 var=ufs_var,
-                lat=(region['latmin'], region['latmax']),
-                lon=(region['lonmin'], region['lonmax']),
+                # lat=(region['latmin'], region['latmax']),
+                # lon=(region['lonmin'], region['lonmax']),
+                lat=get_this_lat,
+                lon=get_this_lon,
                 time=time_range,
                 member=this_member,
                 **kwargs
