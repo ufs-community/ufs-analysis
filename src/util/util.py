@@ -110,7 +110,7 @@ def combine_ufs_means(ufs_experiments_list: list[str],
                                             experiment=this_experiment,
                                             # filename=this_filename,
                                             model='atm')
-        print(this_data_reader.dataset().lat.values[:10])
+
         data_reader_list.append(this_data_reader)
 
     members = ['ens_avg']
@@ -134,6 +134,10 @@ def combine_ufs_means(ufs_experiments_list: list[str],
         this_ds = this_ds.assign_coords(member=('member', [this_member]))
 
         this_ds = this_ds.rename_vars({ufs_var: ufs_vars_list[0]})
+
+        # If there is only 1 lat/lon value, then flatten. Beware of possible risks.
+        if kwargs.get('flatten', False) is True and len(this_ds.lat.values) == 1:
+            this_ds = this_ds.squeeze(['lat', 'lon']).drop_vars(['lat', 'lon'])
 
         ds_list.append(this_ds)
 
