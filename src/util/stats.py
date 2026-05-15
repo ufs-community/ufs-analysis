@@ -492,30 +492,29 @@ def plot_index_spaghetti(ufs_stats: dict,
 
             x_values = forecast_times
 
+            # If plotting anomaly, draw a zero line.
+            zero_line_properties = {
+                'y': 0,
+                'color': 'lightgrey',
+                'linestyle': 'solid',
+                'linewidth': 0.2,
+                'zorder': -1000}
+
+            if len(decade_batches) == 1:
+                axs.axhline(**zero_line_properties)
+            else:
+                axs[this_decade_index].axhline(**zero_line_properties)
+
             if calc_anomaly is False:
                 # Compute index (region was already sliced)
                 y_values = ufs_index.sel(member=this_member).values
 
-                # y_values is a lists of sublists, where each sublist represents the leads for an init
+                # y_values is a list of lists, where each sublist represents the leads for an init
                 # Flatten that list:
                 y_values = [item for sublist in y_values for item in sublist]
 
             # Calculate anomaly
             elif calc_anomaly is True:
-
-                # If plotting anomaly, draw a zero line.
-                zero_line_properties = {
-                    'y': 0,
-                    'color': 'lightgrey',
-                    'linestyle': 'solid',
-                    'linewidth': 0.2,
-                    'zorder': -1000}
-
-                if len(decade_batches) == 1:
-                    axs.axhline(**zero_line_properties)
-                else:
-                    axs[this_decade_index].axhline(**zero_line_properties)
-
                 # Calculate the anomaly
                 # ufs_climatology_ens_mean_values = []
                 y_values = []
