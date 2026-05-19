@@ -71,12 +71,12 @@ def calc_climatology_anomaly(ds: xr.Dataset,
     # Compute climatological mean for each month of the year as a function of init.month
     if 'init' in ds.dims:
         results['climatology_mean'] = ds.groupby('init.month').mean(['init'])[var].compute()
-        results['climatology_std'] = ds.groupby('init.month').std(['init'])[var].compute()
+        results['climatology_std'] = ds.groupby('init.month').std(['init'], ddof=1)[var].compute()
 
     # or per time.month
     elif 'time' in ds.dims:
         results['climatology_mean'] = ds.groupby('time.month').mean(['time'])[var].compute()
-        results['climatology_std'] = ds.groupby('time.month').std(['time'])[var].compute()
+        results['climatology_std'] = ds.groupby('time.month').std(['time'], ddof=1)[var].compute()
 
     # Calculate Anomaly as a final step.
     anomaly = calc_anomaly(ds=results['monthly_mean'].to_dataset(),
@@ -96,37 +96,39 @@ def calc_anomaly(ds: xr.Dataset, var: str, stats: dict, use_member_climatology=T
 
     '''climatology stats have already been computed, now calculate anomaly'''
 
-    if use_member_climatology is False and 'init' in ds.dims:
-        for this_member in ds.member.values:
+    new_ds = copy.deepcopy(ds)
+
+    if use_member_climatology is False and 'init' in new_ds.dims:
+        for this_member in new_ds.member.values:
             stats['climatology_mean'] = stats['climatology_mean'].where(
                 stats['climatology_mean'].member == this_member, stats['climatology_mean'].sel(member=-1))
 
-    ds = ds.assign(anomaly=xr.DataArray(np.nan, dims=ds.dims, coords=ds.coords))
+    new_ds = new_ds.assign(anomaly=xr.DataArray(np.nan, dims=new_ds.dims, coords=new_ds.coords))
 
-    if 'init' in ds.dims:
-        for i in range(len(ds[var].init.values)):
+    if 'init' in new_ds.dims:
+        for i in range(len(new_ds[var].init.values)):
 
-            this_init = ds.init.values[i]
+            this_init = new_ds.init.values[i]
             this_init_month = this_init.astype('datetime64[M]').astype(int) % 12 + 1
 
             this_climatology = stats['climatology_mean'].sel(month=this_init_month)
-            this_anomaly = ds[var].sel(init=this_init) - this_climatology
+            this_anomaly = new_ds[var].sel(init=this_init) - this_climatology
 
             # Assign anomaly values to dataset
-            ds['anomaly'].loc[{'init': this_init}] = this_anomaly
+            new_ds['anomaly'].loc[{'init': this_init}] = this_anomaly
 
     else:
-        for i in range(len(ds[var].time.values)):
+        for i in range(len(new_ds[var].time.values)):
 
-            this_time = ds.time.values[i]
+            this_time = new_ds.time.values[i]
             this_month = this_time.astype('datetime64[M]').astype(int) % 12 + 1
 
             this_climatology = stats['climatology_mean'].sel(month=this_month)
-            this_anomaly = ds[var].sel(time=this_time) - this_climatology
+            this_anomaly = new_ds[var].sel(time=this_time) - this_climatology
 
-            ds['anomaly'].loc[{'time': this_time}] = this_anomaly
+            new_ds['anomaly'].loc[{'time': this_time}] = this_anomaly
 
-    return ds
+    return new_ds
 
 
 def normalize(da: xr.DataArray, stats: dict) -> xr.DataArray:
