@@ -137,7 +137,7 @@ def combine_ufs_means(ufs_experiments_list: list[str],
 
         # If there is only 1 lat/lon value, then flatten. Beware of possible risks.
         if kwargs.get('flatten', False) is True and len(this_ds.lat.values) == 1:
-            this_ds = this_ds.squeeze(['lat', 'lon']).drop_vars(['lat', 'lon'])
+            this_ds = this_ds.squeeze(['lat', 'lon', 'lev']).drop_vars(['lat', 'lon', 'lev'])
 
         ds_list.append(this_ds)
 
