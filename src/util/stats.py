@@ -98,7 +98,8 @@ def calc_anomaly(ds: xr.Dataset, var: str, stats: dict, use_member_climatology=T
 
     new_ds = copy.deepcopy(ds)
 
-    if use_member_climatology is False and 'init' in new_ds.dims:
+    # If *not* using member climatologies, then insert ens_avg climatology for each member.
+    if use_member_climatology is False and 'init' in new_ds.dims and 'member' in new_ds.dims:
         for this_member in new_ds.member.values:
             stats['climatology_mean'] = stats['climatology_mean'].where(
                 stats['climatology_mean'].member == this_member, stats['climatology_mean'].sel(member=-1))

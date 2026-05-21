@@ -11,7 +11,6 @@ import time
 import warnings
 import xarray as xr
 import numpy as np
-import pandas as pd
 import multiprocessing as mp
 from typing import Union, Tuple, Optional, List
 # import xesmf as xe
