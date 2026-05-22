@@ -8,6 +8,7 @@
 from typing import Union, Tuple
 import copy
 import math
+import scipy
 import numpy as np
 import pandas as pd
 import xarray as xr
@@ -1003,4 +1004,153 @@ def plot_rmse_spread(rmses: dict,
 
     ax.set_title(f"{title}")
 
+    return plt
+
+
+def plot_acc_heatmap(ufs_da: xr.DataArray,
+                     verif_da: xr.DataArray,
+                     title='',
+                     sigalpha=0.05,
+                     dpi=300):
+    '''
+    Calculate Pearson Correlation Coefficient (in our case this the Anomaly Correlation Coefficient).
+    DataArray with init+lead vs DataArray with time dimensions.
+    sigalpha is significance level, used for plotting purposes.
+    '''
+
+    if 'init' not in ufs_da.dims or 'lead' not in ufs_da.dims:
+        raise ValueError(f'ufs_da must have init and lead dimensions, got {ufs_da.dims}')
+
+    if 'time' not in verif_da.dims:
+        raise ValueError(f'verif_da must have time dimension, got {verif_da.dims}')
+
+    # ---------------------------------
+    # Calculate ACC
+    # ---------------------------------
+
+    # Get all inits and leads
+    all_inits = list(ufs_da.init.values)
+    all_leads = list(ufs_da.lead.values)
+
+    # Get calendar months
+    all_init_months = list(set([pd.to_datetime(this_init).month for this_init in all_inits]))
+
+    # Initialize accs
+    accs = dict.fromkeys(all_init_months)
+    ps = dict.fromkeys(all_init_months)
+
+    # Calculate acc per calendar month per lead
+    for i in range(len(all_init_months)):
+
+        # Get this calendar month and all the exact init values corresponding to it.
+        this_init_month = all_init_months[i]
+        these_inits = [this_init for this_init in all_inits if pd.to_datetime(this_init).month == this_init_month]
+
+        # These lists store results temporarily.
+        accs_for_this_init_month = []
+        p_for_this_init_month = []
+
+        # Loop over leads
+        for j in range(len(all_leads)):
+            this_lead = all_leads[j]
+
+            # Get UFS 1-d array
+            all_ufs_values = [ufs_da.sel(init=this_init, lead=this_lead).values.item()
+                              for this_init in these_inits]
+
+            # Get VERIF 1-d array
+            all_verif_values = []
+            for this_init in these_inits:
+
+                # forward project to get time value.
+                # By nature of ACC heatmap, we can assume monthly resolution.
+                this_time = timeutil.time_offset(freq_unit='MS',
+                                                 init=this_init,
+                                                 lead=this_lead,
+                                                 step=np.timedelta64(30, 'D'),
+                                                 direction='forward')
+
+                # Get value for this time.
+                all_verif_values.append(verif_da.sel(time=this_time).values.item())
+
+            # Sanity check
+            if len(all_ufs_values) != len(all_verif_values):
+                msg = f'Differing lengths for UFS values {len(all_ufs_values)} '
+                msg += f'and VERIF values {len(all_verif_values)} trying to calculate ACC.'
+                raise ValueError(msg)
+
+            # Compute Pearson Correlation Coefficient
+            r, p_value = scipy.stats.pearsonr(all_ufs_values, all_verif_values)
+
+            # Append results to this calendar month
+            accs_for_this_init_month.append(r)
+            p_for_this_init_month.append(p_value)
+
+        # Store results
+        accs[this_init_month] = accs_for_this_init_month
+        ps[this_init_month] = p_for_this_init_month
+
+    # ---------------------------------
+    # Plot ACC Heatmap
+    # ---------------------------------
+
+    # Create skill mesh for plotting, insert values
+    skill_mesh = np.full((12, 12), np.nan)
+    p_mesh = np.full((12, 12), np.nan)
+
+    # Insert values into mesh
+    for this_acc in accs.keys():
+        skill_mesh[:, this_acc] = accs[this_acc]
+        p_mesh[:, this_acc] = ps[this_acc]
+
+    # Initialize figure
+    fig, ax = plt.subplots(figsize=(7, 5), dpi=dpi)
+
+    # Colormesh
+    pcm = ax.pcolormesh(skill_mesh, cmap=plt.cm.YlOrRd, vmin=-0.4, vmax=1.0)
+    fig.colorbar(pcm, ax=ax)
+
+    # Define tick marks.  We engage in a little tick-mark fudgery for extra readability.
+    # x - calendar months 1-12
+    xtick_values = np.arange(1, 14) + 0.5
+    xtick_labels = [str(this) for this in np.arange(1, 14)]
+
+    # y - leads 0-11
+    ytick_values = np.arange(0, 12) + 0.5
+    ytick_labels = [str(this) for this in np.arange(0, 12)]
+
+    # Set ticks
+    plt.xticks(ticks=xtick_values, labels=xtick_labels)
+    plt.yticks(ticks=ytick_values, labels=ytick_labels)
+
+    # Set range
+    plt.xlim(1, 13)
+
+    # Set title and labels
+    title = title.strip()  # strip white space
+    if title == '':
+        title = 'ACC'  # Default plot title
+
+    plt.title(title)
+    plt.xlabel("Initial Month")
+    plt.ylabel("Lead Time (Months)")
+
+    # Add ACC value labels
+    for i in range(skill_mesh.shape[0]):
+        for j in range(skill_mesh.shape[1]):
+
+            # this ACC value
+            acc_val = skill_mesh[i, j]
+
+            # Only print ACC value if p-value <= sigalpha
+            if not np.isnan(acc_val) and p_mesh[i][j] <= sigalpha:
+                # Center the text in the middle of the cell
+                text_x = j + 0.5
+                text_y = i + 0.5
+
+                ax.text(text_x, text_y, f"{acc_val:.1f}",
+                        ha='center', va='center',
+                        color='black', fontweight='light', fontsize=8)
+
+    # Done with work
     return plt
