@@ -391,7 +391,8 @@ class ONI:
 
 def calc_composite_layers(data_reader: DataReader_Super.DataReader,
                           var: Union[str, List[str]],
-                          statistics: Union[str, List[str]]) -> xr.Dataset:
+                          statistics: Union[str, List[str]],
+                          subset_years: list) -> xr.Dataset:
 
     '''
     Calculate anomaly, restoring effect, stationary wave number, or rossby wave source.
@@ -442,6 +443,10 @@ def calc_composite_layers(data_reader: DataReader_Super.DataReader,
     # Extract Xarray dataset.
     ds = data_reader.dataset()
 
+    # Subset Data based on these years
+    ds_mask = (ds.init.dt.year.isin(subset_years))
+    ds_subset = ds.where(ds_mask, drop=True)
+
     if 'restoring effect' in statistics or 'stationary wave number' in statistics:
 
         print('Calculating restoring effect (Beta star) and stationary wave number (Ks)')
@@ -463,7 +468,7 @@ def calc_composite_layers(data_reader: DataReader_Super.DataReader,
             raise ValueError(msg)
 
         # Calculate Beta* and Ks
-        ds = stats.calc_betastar_kwavenumber(ds, uvar=use_this_var)
+        ds_subset = stats.calc_betastar_kwavenumber(ds_subset, uvar=use_this_var)
 
     if 'anomaly' in statistics:
         print("Calculating climatology statistics and anomalies.")
@@ -472,7 +477,7 @@ def calc_composite_layers(data_reader: DataReader_Super.DataReader,
         ds_stats = stats.calc_climatology_anomaly(ds[[var[0]]], area_mean=False)
 
         # Calculate Anomaly
-        ds = stats.calc_anomaly(ds=ds, var=var[0], stats=ds_stats)
+        ds_subset = stats.calc_anomaly(ds=ds_subset, var=var[0], stats=ds_stats)
 
     if 'rossby wave source' in statistics:
 
@@ -499,17 +504,17 @@ def calc_composite_layers(data_reader: DataReader_Super.DataReader,
         # ---------------
 
         # Compute RWS
-        ds = rws.calc_rws(ds,
-                          absvrt_stats=ds_absvrt_stats,  # Absolute Vorticity
-                          absvrt_anomaly=ds_absvrt_anomaly,
-                          uchi_stats=ds_uchi_stats,  # UCHI
-                          uchi_anomaly=ds_uchi_anomaly,
-                          vchi_stats=ds_vchi_stats,  # VCHI
-                          vchi_anomaly=ds_vchi_anomaly)
+        ds_subset = rws.calc_rws(ds_subset,
+                                 absvrt_stats=ds_absvrt_stats,  # Absolute Vorticity
+                                 absvrt_anomaly=ds_absvrt_anomaly,
+                                 uchi_stats=ds_uchi_stats,  # UCHI
+                                 uchi_anomaly=ds_uchi_anomaly,
+                                 vchi_stats=ds_vchi_stats,  # VCHI
+                                 vchi_anomaly=ds_vchi_anomaly)
 
     print(f"{', '.join(statistics)} calculations finished.")
 
-    return ds.load()
+    return ds_subset.load()
 
 
 def plot_composite(da: xr.DataArray,
