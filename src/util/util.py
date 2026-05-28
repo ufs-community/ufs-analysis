@@ -206,3 +206,15 @@ def print_fixed_width(list_of_strings: list[str]) -> str:
     df.columns = [''] * n_cols
 
     return df.to_string(index=False)
+
+
+def add_month_number(month_number, lead):
+    '''Add integer to a month number to get a new month number
+       E.g., month_number=11, lead=2 -> new month_number=1
+    '''
+    new_month_number = month_number + lead
+
+    if new_month_number > 12:
+        new_month_number = new_month_number % 12
+
+    return new_month_number

@@ -1107,7 +1107,7 @@ def plot_acc_heatmap(ufs_da: xr.DataArray,
     fig, ax = plt.subplots(figsize=(7, 5), dpi=dpi)
 
     # Colormesh
-    pcm = ax.pcolormesh(skill_mesh, cmap=plt.cm.YlOrRd, vmin=-0.4, vmax=1.0)
+    pcm = ax.pcolormesh(skill_mesh, cmap=plt.cm.RdYlBu_r, vmin=-1.0, vmax=1.0)
     fig.colorbar(pcm, ax=ax)
 
     # Define tick marks.  We engage in a little tick-mark fudgery for extra readability.
