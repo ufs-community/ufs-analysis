@@ -227,12 +227,3 @@ def add_month_number(month_number, lead):
             new_month_number = new_month_number % 12
 
     return new_month_number
-
-
-
-
-
-
-
-
-
