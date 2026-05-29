@@ -212,9 +212,27 @@ def add_month_number(month_number, lead):
     '''Add integer to a month number to get a new month number
        E.g., month_number=11, lead=2 -> new month_number=1
     '''
+    if month_number < 1 or month_number > 12:
+        raise ValueError(f'month_number must be between 1 and 12, got {month_number}')
+
+    if lead < 0:
+        raise ValueError(f'lead must be > 0, got {lead}')
+
     new_month_number = month_number + lead
 
     if new_month_number > 12:
-        new_month_number = new_month_number % 12
+        if new_month_number % 12 == 0:
+            new_month_number = (new_month_number - 1) % 12 + 1
+        else:
+            new_month_number = new_month_number % 12
 
     return new_month_number
+
+
+
+
+
+
+
+
+
