@@ -9,6 +9,7 @@ import os
 import sys
 import warnings
 from typing import Optional, Union, Tuple, List
+import copy
 import numpy as np
 import matplotlib.pyplot as plt
 import xarray as xr
@@ -392,7 +393,7 @@ class ONI:
 def calc_composite_layers(data_reader: DataReader_Super.DataReader,
                           var: Union[str, List[str]],
                           statistics: Union[str, List[str]],
-                          subset_years: list) -> xr.Dataset:
+                          exclude_initleads: list[tuple[np.datetime64, int]]) -> xr.Dataset:
 
     '''
     Calculate anomaly, restoring effect, stationary wave number, or rossby wave source.
@@ -442,10 +443,20 @@ def calc_composite_layers(data_reader: DataReader_Super.DataReader,
 
     # Extract Xarray dataset.
     ds = data_reader.dataset()
+    ds_subset = copy.deepcopy(ds)
 
-    # Subset Data based on these years
-    ds_mask = (ds.init.dt.year.isin(subset_years))
-    ds_subset = ds.where(ds_mask, drop=True)
+    # Exclude data that matches these initleads:
+    for this_initlead in exclude_initleads:
+       
+        this_drop_mask = (ds_subset.init == this_initlead[0])\
+                       & (ds_subset.lead == this_initlead[1])
+        
+        this_keep_mask = ~this_drop_mask
+        
+        ds_subset = ds_subset.where(this_keep_mask, drop=True)
+        
+    # Drop all-NA inits
+    ds_subset = ds_subset.dropna(dim='init', how="all")
 
     if 'restoring effect' in statistics or 'stationary wave number' in statistics:
 
