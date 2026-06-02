@@ -5,7 +5,7 @@
 #  Purpose: Utility for model and climate statistics.
 # ---------------------------------------------------------------------------------------------------------------------
 
-from typing import Union, Tuple
+from typing import Optional, Union, Tuple, List
 import copy
 import math
 import scipy
@@ -14,6 +14,9 @@ import pandas as pd
 import xarray as xr
 import matplotlib.pyplot as plt
 import itertools
+from ..regridder import Regrid    
+from ..datareader import datareader as dr    
+from ..datareader import DataReader_Super
 from . import timeutil, rws
 
 
@@ -362,6 +365,359 @@ def calc_betastar_kwavenumber(ds: xr.Dataset, uvar: str) -> xr.Dataset:
         final_result = final_result.expand_dims(lev=[stored_lev])
 
     return final_result
+
+
+def calc_composite_layers(data_reader: DataReader_Super.DataReader,
+                          var: Union[str, List[str]],
+                          statistics: Union[str, List[str]],
+                          exclude_initleads: list[tuple[np.datetime64, int]]) -> xr.Dataset:
+
+    '''
+    Calculate anomaly, restoring effect, stationary wave number, or rossby wave source.
+    A calculation is made on 1 timestep at a time, forming each layer in a composite analysis.
+    '''
+
+    # The user may request these statistics.
+    available_statistics = ['anomaly',
+                            'restoring effect',
+                            'stationary wave number',
+                            'rossby wave source']
+
+    # Check data types:
+    # Input variables.
+    if isinstance(var, str):
+        var = [var]
+    elif not isinstance(var, list):
+        msg = "var must be a string (1 variable) or list of strings (2 variables)."
+        raise ValueError(msg)
+
+    # Statistics requested.
+    if isinstance(statistics, str):
+        statistics = [statistics]
+
+    if not isinstance(statistics, list):
+        msg = f"statistics must be a string value or a list of string values in {available_statistics}"
+        raise ValueError(msg)
+
+    if len(statistics) == 0:
+        raise ValueError(f'Must enter statistics= one or more of {available_statistics}')
+
+    # Coerce every statistic name to lower case
+    statistics = [stat.lower() for stat in statistics]
+
+    # if statistic not in available_statistics:
+    not_available = set(statistics).difference(available_statistics)
+    if len(not_available) > 0:
+        msg = f"{not_available} is not available. statistics must be one or more of {available_statistics}'"
+        raise ValueError(msg)
+
+    # Get type of datareader (turn something like "src.datareader.UFS_DataReader.UFS_DataReader" into "UFS")
+    dr_type = str(type(data_reader)).split('.')[-1].split('_')[0]
+
+    # Check if a type is UFS. If so, get its releast tag and append to 'type'
+    if dr_type == 'UFS' and hasattr(data_reader, 'experiment'):
+        dr_type += str(data_reader.experiment)
+
+    # Extract Xarray dataset.
+    ds = data_reader.dataset()
+    ds_subset = copy.deepcopy(ds)
+
+    # Exclude data that matches these initleads:
+    for this_initlead in exclude_initleads:
+
+        this_drop_mask = (ds_subset.init == this_initlead[0])\
+                       & (ds_subset.lead == this_initlead[1])
+
+        this_keep_mask = ~this_drop_mask
+
+        ds_subset = ds_subset.where(this_keep_mask, drop=True)
+
+    # Drop all-NA inits
+    ds_subset = ds_subset.dropna(dim='init', how="all")
+
+    if 'restoring effect' in statistics or 'stationary wave number' in statistics:
+
+        print('Calculating restoring effect (Beta star) and stationary wave number (Ks)')
+
+        # We must first check that U_WIND has been specified by the user.
+        U_WIND_FOUND = False
+        for wind_set in data_reader.WINDS:
+
+            if var[0] == wind_set['U_WIND']:
+                U_WIND_FOUND = True
+                use_this_var = var[0]
+
+            if var[1] == wind_set['U_WIND']:
+                U_WIND_FOUND = True
+                use_this_var = var[1]
+
+        if U_WIND_FOUND is False:
+            msg = f'restoring effect and/or stationary wave number require U wind component, got {var}'
+            raise ValueError(msg)
+
+        # Calculate Beta* and Ks
+        ds_subset = stats.calc_betastar_kwavenumber(ds_subset, uvar=use_this_var)
+
+    if 'anomaly' in statistics:
+        print("Calculating climatology statistics and anomalies.")
+
+        # Compute climatology statistics
+        ds_stats = stats.calc_climatology_anomaly(ds[[var[0]]], area_mean=False)
+
+        # Calculate Anomaly
+        ds_subset = stats.calc_anomaly(ds=ds_subset, var=var[0], stats=ds_stats)
+
+    if 'rossby wave source' in statistics:
+
+        # RWS Components across entire data record.
+        print('Calculating Rossby Wave Source (RWS) components.')
+        ds = rws.calc_rws_components(ds, var[0], var[1])
+
+        # -----------
+        # STATISTICS
+        # -----------
+        print('Calculating RWS component climatology statistics and anomalies.')
+        # Climatologies
+        ds_absvrt_stats = stats.calc_climatology_anomaly(ds[['absvrt']], area_mean=False)
+        ds_uchi_stats = stats.calc_climatology_anomaly(ds[['uchi']], area_mean=False)
+        ds_vchi_stats = stats.calc_climatology_anomaly(ds[['vchi']], area_mean=False)
+
+        # Anomalies
+        ds_absvrt_anomaly = stats.calc_anomaly(ds=ds, var='absvrt', stats=ds_absvrt_stats)
+        ds_uchi_anomaly = stats.calc_anomaly(ds=ds, var='uchi', stats=ds_uchi_stats)
+        ds_vchi_anomaly = stats.calc_anomaly(ds=ds, var='vchi', stats=ds_vchi_stats)
+
+        # ---------------
+        # END STATISTICS
+        # ---------------
+
+        # Compute RWS
+        ds_subset = rws.calc_rws(ds_subset,
+                                 absvrt_stats=ds_absvrt_stats,  # Absolute Vorticity
+                                 absvrt_anomaly=ds_absvrt_anomaly,
+                                 uchi_stats=ds_uchi_stats,  # UCHI
+                                 uchi_anomaly=ds_uchi_anomaly,
+                                 vchi_stats=ds_vchi_stats,  # VCHI
+                                 vchi_anomaly=ds_vchi_anomaly)
+
+    print(f"{', '.join(statistics)} calculations finished.")
+
+    return ds_subset.load()
+
+
+def plot_composite(da: xr.DataArray,
+                   shading: xr.DataArray = None,
+                   shading_threshold: float = 0.05,
+                   title: str = '',
+                   subtitle: str = '',
+                   vmin: float = None,
+                   vmax: float = None,
+                   cmap: str = 'BuPu',
+                   cmap_label: str = None,
+                   topleft_label: str = None,
+                   bottomright_label: str = None,
+                   region: dict = None,
+                   dpi=200):
+    '''
+    Generate shaded contour plot for composite statistics.
+    '''
+
+    # Drop lev dimension if it exists. Upstream logic has already confirmed that these data are flat.
+    if 'lev' in da.dims:
+        da = da.squeeze(dim='lev')
+
+    cmap_center = False
+    if vmin is not None and vmax is not None:
+        if vmin == -1 * vmax:
+            cmap_center = True
+
+    center = 180
+    projection = ccrs.PlateCarree(central_longitude=center)
+
+    crs = ccrs.PlateCarree()
+
+    # Instantiate plot
+    plt.figure(figsize=(14, 7), dpi=dpi)
+    ax = plt.axes(projection=projection)
+    # ax.set_global()
+
+    # Gridlines
+    gl = ax.gridlines(crs=ccrs.PlateCarree(), draw_labels=True,
+                      linewidth=0.5, color='gray', alpha=0.3,
+                      linestyle='--')  # dashes=(5, 1))
+
+    gl.xlocator = mticker.FixedLocator([-180, -120, -60, 0, 60, 120, 180])
+    gl.top_labels = False
+    gl.right_labels = False
+
+    # Remove degree symbol from gridline labels
+    gl.xformatter = LongitudeFormatter(degree_symbol='')
+    gl.yformatter = LatitudeFormatter(degree_symbol='')
+
+    cbar_kwargs = {
+        'orientation': 'horizontal',
+        'shrink': 0.7,
+        'pad': 0.05
+    }
+
+    # Preserve the name of the cmap input. The following logic may coerce cmap to different variable type.
+    cmap_string = cmap
+
+    # Load custom cmaps
+    CUSTOM_CMAPS = cmaps.process_cmaps_yaml()
+
+    if cmap in CUSTOM_CMAPS:
+        # Adjust n_levels
+        n_levels = len(CUSTOM_CMAPS[cmap]) + 1
+        # Load up the color map.  This variable is now a matplotlib object.
+        # cmap = mcolors.LinearSegmentedColormap.from_list('', CUSTOM_CMAPS[cmap])
+        cmap = ListedColormap(CUSTOM_CMAPS[cmap])
+    else:
+        n_levels = 20
+
+    plot_args = {
+        'ax': ax,
+        'transform': crs,
+        'cmap': cmap,  # cmap could be a string or a ListedColormap, at this point.
+        'levels': n_levels,
+        'extend': 'neither'  # Disable colorbar pointed extensions
+    }
+
+    plot_args['cbar_kwargs'] = cbar_kwargs
+
+    if vmin is not None and vmax is not None:
+        plot_args.update({'vmin': vmin, 'vmax': vmax})
+
+    # We will add a label for the min, max, and average values across this field.
+    min_value = da.min().values.item()
+    avg_value = da.mean().values.item()
+    max_value = da.max().values.item()
+    std_value = da.std().values.item()
+
+    # Cap values at the color bar range
+    # (there is a matplotlib bug where values that deviate greatly from colorbar range show up as white)
+    if vmin is not None:
+        da = da.clip(min=vmin)
+
+    if vmax is not None:
+        da = da.clip(max=vmax)
+
+    # Make plot
+    p = da.plot.contourf(**plot_args)
+
+    # Draw contour lines with hardcoded expectations for certain custom cmaps.
+    if cmap_string == 'beta_star':
+        da_for_lines = (da >= 0).astype(int)
+        lines = da_for_lines.plot.contour(ax=ax, transform=crs, colors='black', linewidths=0.5, levels=1)
+
+    if cmap_string in ['Ks', 'Ks_diff']:
+        da_for_lines = da.notnull().astype(int)
+        lines = da_for_lines.plot.contour(ax=ax, transform=crs, colors='black', linewidths=0.5, levels=1)
+
+    # Center the colormap about 0
+    if vmin is not None and vmax is not None:
+
+        ticks = np.linspace(vmin, vmax, n_levels)
+        cbar = p.colorbar
+
+        tick_locations = []
+        tick_labels = []
+
+        tick_locations.append(vmin)
+        tick_labels.append(f'{vmin:.1f}')
+
+        for i in range(n_levels):
+
+            # Skip ends.
+            if i == 0 or i == (n_levels - 1):
+                continue
+
+            # Display 0 at center.
+            if cmap_center is True and i == (n_levels / 2) - 1:
+                tick_locations.append(0)
+                tick_labels.append('0')
+                continue
+
+            # Don't display a value directly adjacent to 0.
+            if cmap_center is True and i == (n_levels / 2):
+                continue
+
+            if i < (n_levels / 2):
+                if i % 2 == 1:
+                    continue
+                tick_locations.append(ticks[i])
+                tick_labels.append(f'{ticks[i]:.1f}')
+
+            elif i > ((n_levels - 1) / 2):
+                if i % 2 != 1:
+                    continue
+                tick_locations.append(ticks[i])
+                tick_labels.append(f'{ticks[i]:.1f}')
+
+        if cmap_string == 'beta_star':
+            tick_labels[0] = ''
+
+        tick_locations.append(vmax)
+        tick_labels.append(f'{vmax:.1f}')
+
+        cbar.set_ticks(tick_locations)
+        cbar.set_ticklabels(tick_labels)
+
+        if cmap_label is not None:
+            cbar.set_label(cmap_label, size=12)  # , weight='bold')
+
+    ax.coastlines()
+
+    # Draw square if a region is specified (e.g. nino 3.4)
+    if region is not None:
+        rect = mpatches.Rectangle((region['lonmin'], region['latmin']),
+                                  width=(region['lonmax'] - region['lonmin']),
+                                  height=(region['latmax'] - region['latmin']),
+                                  color='black', fill=None, linewidth=0.5, alpha=0.75, zorder=1000,
+                                  transform=ccrs.PlateCarree())
+
+        ax.add_patch(rect)  # Add patch
+
+    plt.title(f'{title}')
+
+    # Add label to bottom right
+    lower_left_values_label = f'max:\nmin:'
+    lower_left_values_text = f'{max_value:.3f}\n{min_value:.3f}'
+
+    if topleft_label is not None:
+        ax.text(0.000001, 0.99999, topleft_label, ha='left', va='bottom', fontweight='bold', transform=ax.transAxes)
+
+    if bottomright_label is not None:
+        ax.text(0.99, 0.01, bottomright_label, ha='right', va='bottom', fontweight='bold', transform=ax.transAxes)
+
+    top_right_values_label = f'mean:\nstdev:'
+    top_right_values_text = f'{avg_value:.3f}\n{std_value:.3f}'
+
+    ax.text(0.01, 0.01, lower_left_values_label, ha='left', va='bottom', fontweight='bold', transform=ax.transAxes)
+    ax.text(0.15, 0.01, lower_left_values_text, ha='right', va='bottom', fontweight='bold', transform=ax.transAxes)
+
+    ax.text(0.85999, 0.99999, top_right_values_label, ha='left', va='bottom', fontweight='bold', transform=ax.transAxes)
+    ax.text(1.000001, .99999, top_right_values_text, ha='right', va='bottom', fontweight='bold', transform=ax.transAxes)
+
+    # Place title and subtitle
+    plt.title(f'{title}\n', pad=12)
+    ax.text(0.5, 1, subtitle, ha='center', va='bottom', fontweight='bold', transform=ax.transAxes)
+
+    # Add shaded layer based on threshold.
+    if shading is not None:
+
+        # Convert values to binary 0-1
+        shading = (shading <= shading_threshold).astype(int)
+
+        p = shading.plot.contourf(colors='None',
+                                  hatches=['', '...'],
+                                  levels=[0, 0.5, 1],
+                                  add_colorbar=False,
+                                  add_labels=False,
+                                  ax=ax,
+                                  transform=crs)
+
+    return plt
 
 
 def plot_index_spaghetti(ufs_stats: dict,
