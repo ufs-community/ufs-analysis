@@ -14,11 +14,12 @@ import pandas as pd
 import xarray as xr
 import matplotlib.pyplot as plt
 import itertools
-from ..regridder import Regrid    
-from ..datareader import datareader as dr    
-from ..datareader import DataReader_Super
-from . import timeutil, rws
-
+from matplotlib.colors import ListedColormap
+import matplotlib.patches as mpatches
+import matplotlib.ticker as mticker
+import cartopy.crs as ccrs
+from cartopy.mpl.ticker import LongitudeFormatter, LatitudeFormatter
+from . import timeutil, rws, cmaps
 
 plt.rcParams['font.family'] = 'sans-serif'
 plt.rcParams['font.sans-serif'] = ['Cantarell'] + plt.rcParams['font.sans-serif']
@@ -367,7 +368,7 @@ def calc_betastar_kwavenumber(ds: xr.Dataset, uvar: str) -> xr.Dataset:
     return final_result
 
 
-def calc_composite_layers(data_reader: DataReader_Super.DataReader,
+def calc_composite_layers(data_reader,  # : DataReader_Super.DataReader,
                           var: Union[str, List[str]],
                           statistics: Union[str, List[str]],
                           exclude_initleads: list[tuple[np.datetime64, int]]) -> xr.Dataset:
@@ -456,16 +457,16 @@ def calc_composite_layers(data_reader: DataReader_Super.DataReader,
             raise ValueError(msg)
 
         # Calculate Beta* and Ks
-        ds_subset = stats.calc_betastar_kwavenumber(ds_subset, uvar=use_this_var)
+        ds_subset = calc_betastar_kwavenumber(ds_subset, uvar=use_this_var)
 
     if 'anomaly' in statistics:
         print("Calculating climatology statistics and anomalies.")
 
         # Compute climatology statistics
-        ds_stats = stats.calc_climatology_anomaly(ds[[var[0]]], area_mean=False)
+        ds_stats = calc_climatology_anomaly(ds[[var[0]]], area_mean=False)
 
         # Calculate Anomaly
-        ds_subset = stats.calc_anomaly(ds=ds_subset, var=var[0], stats=ds_stats)
+        ds_subset = calc_anomaly(ds=ds_subset, var=var[0], stats=ds_stats)
 
     if 'rossby wave source' in statistics:
 
@@ -478,14 +479,14 @@ def calc_composite_layers(data_reader: DataReader_Super.DataReader,
         # -----------
         print('Calculating RWS component climatology statistics and anomalies.')
         # Climatologies
-        ds_absvrt_stats = stats.calc_climatology_anomaly(ds[['absvrt']], area_mean=False)
-        ds_uchi_stats = stats.calc_climatology_anomaly(ds[['uchi']], area_mean=False)
-        ds_vchi_stats = stats.calc_climatology_anomaly(ds[['vchi']], area_mean=False)
+        ds_absvrt_stats = calc_climatology_anomaly(ds[['absvrt']], area_mean=False)
+        ds_uchi_stats = calc_climatology_anomaly(ds[['uchi']], area_mean=False)
+        ds_vchi_stats = calc_climatology_anomaly(ds[['vchi']], area_mean=False)
 
         # Anomalies
-        ds_absvrt_anomaly = stats.calc_anomaly(ds=ds, var='absvrt', stats=ds_absvrt_stats)
-        ds_uchi_anomaly = stats.calc_anomaly(ds=ds, var='uchi', stats=ds_uchi_stats)
-        ds_vchi_anomaly = stats.calc_anomaly(ds=ds, var='vchi', stats=ds_vchi_stats)
+        ds_absvrt_anomaly = calc_anomaly(ds=ds, var='absvrt', stats=ds_absvrt_stats)
+        ds_uchi_anomaly = calc_anomaly(ds=ds, var='uchi', stats=ds_uchi_stats)
+        ds_vchi_anomaly = calc_anomaly(ds=ds, var='vchi', stats=ds_vchi_stats)
 
         # ---------------
         # END STATISTICS

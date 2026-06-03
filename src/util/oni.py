@@ -5,20 +5,7 @@
 #  Purpose: Define a class that organizes information about Oceanic Niño Index events.
 # ---------------------------------------------------------------------------------------------------------------------
 
-import os
-import sys
-import warnings
 from typing import Optional, Union, Tuple, List
-import copy
-import numpy as np
-import matplotlib.pyplot as plt
-import xarray as xr
-import matplotlib.patches as mpatches
-import matplotlib.ticker as mticker
-from matplotlib.colors import ListedColormap
-import cartopy.crs as ccrs
-from cartopy.mpl.ticker import LongitudeFormatter, LatitudeFormatter
-from . import stats, rws, timeutil, cmaps
 
 
 # Year and highest ONI recorded *in its strength category*
