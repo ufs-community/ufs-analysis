@@ -427,7 +427,7 @@ def calc_composite_layers(data_reader,  # : DataReader_Super.DataReader,
     for this_initlead in exclude_initleads:
 
         this_drop_mask = (ds_subset.init == this_initlead[0])\
-                       & (ds_subset.lead == this_initlead[1])
+            & (ds_subset.lead == this_initlead[1])
 
         this_keep_mask = ~this_drop_mask
 
