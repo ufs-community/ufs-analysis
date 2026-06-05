@@ -1465,7 +1465,7 @@ def plot_acc_heatmap(ufs_da: xr.DataArray,
 
     # Colormesh
     pcm = ax.pcolormesh(skill_mesh, cmap=plt.cm.RdYlBu_r, vmin=-1.0, vmax=1.0)
-    fig.colorbar(pcm, ax=ax)
+    fig.colorbar(pcm, ax=ax, ticks=[-1.0, -0.6, -0.2, 0.2, 0.6, 1.0], format='%.1f')
 
     # Define tick marks.  We engage in a little tick-mark fudgery for extra readability.
     # x - calendar months 1-12
