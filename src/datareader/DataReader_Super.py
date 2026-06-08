@@ -72,6 +72,9 @@ class DataReader(ABC):
 
     @staticmethod
     def to_datetime(time_str: Union[str, datetime.datetime]) -> datetime.datetime:
+        """Convert a time string like '1991-01-01' to a Python datetime object"""
+        if time_str is None:
+            return None
 
         if isinstance(time_str, datetime.datetime):
             return time_str

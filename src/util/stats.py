@@ -5,16 +5,21 @@
 #  Purpose: Utility for model and climate statistics.
 # ---------------------------------------------------------------------------------------------------------------------
 
-from typing import Union, Tuple
+from typing import Optional, Union, Tuple, List
 import copy
 import math
+import scipy
 import numpy as np
 import pandas as pd
 import xarray as xr
 import matplotlib.pyplot as plt
 import itertools
-from . import timeutil, rws
-
+from matplotlib.colors import ListedColormap
+import matplotlib.patches as mpatches
+import matplotlib.ticker as mticker
+import cartopy.crs as ccrs
+from cartopy.mpl.ticker import LongitudeFormatter, LatitudeFormatter
+from . import timeutil, rws, cmaps
 
 plt.rcParams['font.family'] = 'sans-serif'
 plt.rcParams['font.sans-serif'] = ['Cantarell'] + plt.rcParams['font.sans-serif']
@@ -25,7 +30,9 @@ def resample(ds: xr.Dataset, timeslice: Tuple[str, ...], freq) -> xr.Dataset:
     return ds.sel(time=timeslice).resample(time=freq).mean().sortby('time').compute()
 
 
-def calc_climatology_anomaly(ds: xr.Dataset, area_mean=False, use_member_climatology=True) -> dict:
+def calc_climatology_anomaly(ds: xr.Dataset,
+                             area_mean=False,
+                             use_member_climatology=True) -> dict:
 
     '''
     Compute longterm, area-based, monthly climatologies.
@@ -69,12 +76,12 @@ def calc_climatology_anomaly(ds: xr.Dataset, area_mean=False, use_member_climato
     # Compute climatological mean for each month of the year as a function of init.month
     if 'init' in ds.dims:
         results['climatology_mean'] = ds.groupby('init.month').mean(['init'])[var].compute()
-        results['climatology_std'] = ds.groupby('init.month').std(['init'])[var].compute()
+        results['climatology_std'] = ds.groupby('init.month').std(['init'], ddof=1)[var].compute()
 
     # or per time.month
     elif 'time' in ds.dims:
         results['climatology_mean'] = ds.groupby('time.month').mean(['time'])[var].compute()
-        results['climatology_std'] = ds.groupby('time.month').std(['time'])[var].compute()
+        results['climatology_std'] = ds.groupby('time.month').std(['time'], ddof=1)[var].compute()
 
     # Calculate Anomaly as a final step.
     anomaly = calc_anomaly(ds=results['monthly_mean'].to_dataset(),
@@ -94,37 +101,103 @@ def calc_anomaly(ds: xr.Dataset, var: str, stats: dict, use_member_climatology=T
 
     '''climatology stats have already been computed, now calculate anomaly'''
 
-    if use_member_climatology is False and 'init' in ds.dims:
-        for this_member in ds.member.values:
+    new_ds = copy.deepcopy(ds)
+
+    # If *not* using member climatologies, then insert ens_avg climatology for each member.
+    if use_member_climatology is False and 'init' in new_ds.dims and 'member' in new_ds.dims:
+        for this_member in new_ds.member.values:
             stats['climatology_mean'] = stats['climatology_mean'].where(
                 stats['climatology_mean'].member == this_member, stats['climatology_mean'].sel(member=-1))
 
-    ds = ds.assign(anomaly=xr.DataArray(np.nan, dims=ds.dims, coords=ds.coords))
+    new_ds = new_ds.assign(anomaly=xr.DataArray(np.nan, dims=new_ds.dims, coords=new_ds.coords))
 
-    if 'init' in ds.dims:
-        for i in range(len(ds[var].init.values)):
+    if 'init' in new_ds.dims:
+        for i in range(len(new_ds[var].init.values)):
 
-            this_init = ds.init.values[i]
+            this_init = new_ds.init.values[i]
             this_init_month = this_init.astype('datetime64[M]').astype(int) % 12 + 1
 
             this_climatology = stats['climatology_mean'].sel(month=this_init_month)
-            this_anomaly = ds[var].sel(init=this_init) - this_climatology
+            this_anomaly = new_ds[var].sel(init=this_init) - this_climatology
 
             # Assign anomaly values to dataset
-            ds['anomaly'].loc[{'init': this_init}] = this_anomaly
+            new_ds['anomaly'].loc[{'init': this_init}] = this_anomaly
 
     else:
-        for i in range(len(ds[var].time.values)):
+        for i in range(len(new_ds[var].time.values)):
 
-            this_time = ds.time.values[i]
+            this_time = new_ds.time.values[i]
             this_month = this_time.astype('datetime64[M]').astype(int) % 12 + 1
 
             this_climatology = stats['climatology_mean'].sel(month=this_month)
-            this_anomaly = ds[var].sel(time=this_time) - this_climatology
+            this_anomaly = new_ds[var].sel(time=this_time) - this_climatology
 
-            ds['anomaly'].loc[{'time': this_time}] = this_anomaly
+            new_ds['anomaly'].loc[{'time': this_time}] = this_anomaly
 
-    return ds
+    return new_ds
+
+
+def normalize(da: xr.DataArray, stats: dict) -> xr.DataArray:
+    '''
+    Normalize a data array based on pre-computed climatology statistics.
+    The Normalization factor is calculated as a standard z-score:  z = (X - mu) / sigma
+    '''
+    new_da = copy.deepcopy(da)
+
+    if 'init' in da.dims:
+
+        # Get indices
+        all_inits = new_da['init'].values
+        all_leads = new_da['lead'].values
+
+        for i in range(len(all_inits)):
+
+            # Get this index
+            this_init = all_inits[i]
+            this_init_month = pd.to_datetime(this_init).month
+
+            for j in range(len(all_leads)):
+
+                # Get this lead
+                this_lead = all_leads[j]
+
+                # Construct the replacement array
+                replacement_array = new_da.sel(init=this_init, lead=this_lead)
+
+                # Extract terms
+                mean_array = stats['climatology_mean'].sel(month=this_init_month, lead=this_lead)
+                std_array = stats['climatology_std'].sel(month=this_init_month, lead=this_lead)
+
+                # Normalize the data
+                replacement_array = (replacement_array - mean_array) / std_array
+
+                # Insert new data
+                new_da.loc[{'init': this_init, 'lead': this_lead}] = replacement_array.values
+
+    elif 'time' in new_da.dims:
+        # Get indices
+        all_times = new_da['time'].values
+
+        for i in range(len(all_times)):
+
+            # Get this index
+            this_time = all_times[i]
+            this_time_month = pd.to_datetime(this_time).month
+
+            # Construct the replacement array
+            replacement_array = new_da.sel(time=this_time)
+
+            # Extract terms
+            mean_array = stats['climatology_mean'].sel(month=this_time_month)
+            std_array = stats['climatology_std'].sel(month=this_time_month)
+
+            # Normalize the data
+            replacement_array = (replacement_array - mean_array) / std_array
+
+            # Insert new data
+            new_da.loc[{'time': this_time}] = replacement_array.values
+
+    return new_da
 
 
 def radius(lat: float) -> float:
@@ -295,6 +368,359 @@ def calc_betastar_kwavenumber(ds: xr.Dataset, uvar: str) -> xr.Dataset:
     return final_result
 
 
+def calc_composite_layers(data_reader,  # : DataReader_Super.DataReader,
+                          var: Union[str, List[str]],
+                          statistics: Union[str, List[str]],
+                          exclude_initleads: list[tuple[np.datetime64, int]]) -> xr.Dataset:
+
+    '''
+    Calculate anomaly, restoring effect, stationary wave number, or rossby wave source.
+    A calculation is made on 1 timestep at a time, forming each layer in a composite analysis.
+    '''
+
+    # The user may request these statistics.
+    available_statistics = ['anomaly',
+                            'restoring effect',
+                            'stationary wave number',
+                            'rossby wave source']
+
+    # Check data types:
+    # Input variables.
+    if isinstance(var, str):
+        var = [var]
+    elif not isinstance(var, list):
+        msg = "var must be a string (1 variable) or list of strings (2 variables)."
+        raise ValueError(msg)
+
+    # Statistics requested.
+    if isinstance(statistics, str):
+        statistics = [statistics]
+
+    if not isinstance(statistics, list):
+        msg = f"statistics must be a string value or a list of string values in {available_statistics}"
+        raise ValueError(msg)
+
+    if len(statistics) == 0:
+        raise ValueError(f'Must enter statistics= one or more of {available_statistics}')
+
+    # Coerce every statistic name to lower case
+    statistics = [stat.lower() for stat in statistics]
+
+    # if statistic not in available_statistics:
+    not_available = set(statistics).difference(available_statistics)
+    if len(not_available) > 0:
+        msg = f"{not_available} is not available. statistics must be one or more of {available_statistics}'"
+        raise ValueError(msg)
+
+    # Get type of datareader (turn something like "src.datareader.UFS_DataReader.UFS_DataReader" into "UFS")
+    dr_type = str(type(data_reader)).split('.')[-1].split('_')[0]
+
+    # Check if a type is UFS. If so, get its releast tag and append to 'type'
+    if dr_type == 'UFS' and hasattr(data_reader, 'experiment'):
+        dr_type += str(data_reader.experiment)
+
+    # Extract Xarray dataset.
+    ds = data_reader.dataset()
+    ds_subset = copy.deepcopy(ds)
+
+    # Exclude data that matches these initleads:
+    for this_initlead in exclude_initleads:
+
+        this_drop_mask = (ds_subset.init == this_initlead[0])\
+            & (ds_subset.lead == this_initlead[1])
+
+        this_keep_mask = ~this_drop_mask
+
+        ds_subset = ds_subset.where(this_keep_mask, drop=True)
+
+    # Drop all-NA inits
+    ds_subset = ds_subset.dropna(dim='init', how="all")
+
+    if 'restoring effect' in statistics or 'stationary wave number' in statistics:
+
+        print('Calculating restoring effect (Beta star) and stationary wave number (Ks)')
+
+        # We must first check that U_WIND has been specified by the user.
+        U_WIND_FOUND = False
+        for wind_set in data_reader.WINDS:
+
+            if var[0] == wind_set['U_WIND']:
+                U_WIND_FOUND = True
+                use_this_var = var[0]
+
+            if var[1] == wind_set['U_WIND']:
+                U_WIND_FOUND = True
+                use_this_var = var[1]
+
+        if U_WIND_FOUND is False:
+            msg = f'restoring effect and/or stationary wave number require U wind component, got {var}'
+            raise ValueError(msg)
+
+        # Calculate Beta* and Ks
+        ds_subset = calc_betastar_kwavenumber(ds_subset, uvar=use_this_var)
+
+    if 'anomaly' in statistics:
+        print("Calculating climatology statistics and anomalies.")
+
+        # Compute climatology statistics
+        ds_stats = calc_climatology_anomaly(ds[[var[0]]], area_mean=False)
+
+        # Calculate Anomaly
+        ds_subset = calc_anomaly(ds=ds_subset, var=var[0], stats=ds_stats)
+
+    if 'rossby wave source' in statistics:
+
+        # RWS Components across entire data record.
+        print('Calculating Rossby Wave Source (RWS) components.')
+        ds = rws.calc_rws_components(ds, var[0], var[1])
+
+        # -----------
+        # STATISTICS
+        # -----------
+        print('Calculating RWS component climatology statistics and anomalies.')
+        # Climatologies
+        ds_absvrt_stats = calc_climatology_anomaly(ds[['absvrt']], area_mean=False)
+        ds_uchi_stats = calc_climatology_anomaly(ds[['uchi']], area_mean=False)
+        ds_vchi_stats = calc_climatology_anomaly(ds[['vchi']], area_mean=False)
+
+        # Anomalies
+        ds_absvrt_anomaly = calc_anomaly(ds=ds, var='absvrt', stats=ds_absvrt_stats)
+        ds_uchi_anomaly = calc_anomaly(ds=ds, var='uchi', stats=ds_uchi_stats)
+        ds_vchi_anomaly = calc_anomaly(ds=ds, var='vchi', stats=ds_vchi_stats)
+
+        # ---------------
+        # END STATISTICS
+        # ---------------
+
+        # Compute RWS
+        ds_subset = rws.calc_rws(ds_subset,
+                                 absvrt_stats=ds_absvrt_stats,  # Absolute Vorticity
+                                 absvrt_anomaly=ds_absvrt_anomaly,
+                                 uchi_stats=ds_uchi_stats,  # UCHI
+                                 uchi_anomaly=ds_uchi_anomaly,
+                                 vchi_stats=ds_vchi_stats,  # VCHI
+                                 vchi_anomaly=ds_vchi_anomaly)
+
+    print(f"{', '.join(statistics)} calculations finished.")
+
+    return ds_subset.load()
+
+
+def plot_composite(da: xr.DataArray,
+                   shading: xr.DataArray = None,
+                   shading_threshold: float = 0.05,
+                   title: str = '',
+                   subtitle: str = '',
+                   vmin: float = None,
+                   vmax: float = None,
+                   cmap: str = 'BuPu',
+                   cmap_label: str = None,
+                   topleft_label: str = None,
+                   bottomright_label: str = None,
+                   region: dict = None,
+                   dpi=200):
+    '''
+    Generate shaded contour plot for composite statistics.
+    '''
+
+    # Drop lev dimension if it exists. Upstream logic has already confirmed that these data are flat.
+    if 'lev' in da.dims:
+        da = da.squeeze(dim='lev')
+
+    cmap_center = False
+    if vmin is not None and vmax is not None:
+        if vmin == -1 * vmax:
+            cmap_center = True
+
+    center = 180
+    projection = ccrs.PlateCarree(central_longitude=center)
+
+    crs = ccrs.PlateCarree()
+
+    # Instantiate plot
+    plt.figure(figsize=(14, 7), dpi=dpi)
+    ax = plt.axes(projection=projection)
+    # ax.set_global()
+
+    # Gridlines
+    gl = ax.gridlines(crs=ccrs.PlateCarree(), draw_labels=True,
+                      linewidth=0.5, color='gray', alpha=0.3,
+                      linestyle='--')  # dashes=(5, 1))
+
+    gl.xlocator = mticker.FixedLocator([-180, -120, -60, 0, 60, 120, 180])
+    gl.top_labels = False
+    gl.right_labels = False
+
+    # Remove degree symbol from gridline labels
+    gl.xformatter = LongitudeFormatter(degree_symbol='')
+    gl.yformatter = LatitudeFormatter(degree_symbol='')
+
+    cbar_kwargs = {
+        'orientation': 'horizontal',
+        'shrink': 0.7,
+        'pad': 0.05
+    }
+
+    # Preserve the name of the cmap input. The following logic may coerce cmap to different variable type.
+    cmap_string = cmap
+
+    # Load custom cmaps
+    CUSTOM_CMAPS = cmaps.process_cmaps_yaml()
+
+    if cmap in CUSTOM_CMAPS:
+        # Adjust n_levels
+        n_levels = len(CUSTOM_CMAPS[cmap]) + 1
+        # Load up the color map.  This variable is now a matplotlib object.
+        # cmap = mcolors.LinearSegmentedColormap.from_list('', CUSTOM_CMAPS[cmap])
+        cmap = ListedColormap(CUSTOM_CMAPS[cmap])
+    else:
+        n_levels = 20
+
+    plot_args = {
+        'ax': ax,
+        'transform': crs,
+        'cmap': cmap,  # cmap could be a string or a ListedColormap, at this point.
+        'levels': n_levels,
+        'extend': 'neither'  # Disable colorbar pointed extensions
+    }
+
+    plot_args['cbar_kwargs'] = cbar_kwargs
+
+    if vmin is not None and vmax is not None:
+        plot_args.update({'vmin': vmin, 'vmax': vmax})
+
+    # We will add a label for the min, max, and average values across this field.
+    min_value = da.min().values.item()
+    avg_value = da.mean().values.item()
+    max_value = da.max().values.item()
+    std_value = da.std().values.item()
+
+    # Cap values at the color bar range
+    # (there is a matplotlib bug where values that deviate greatly from colorbar range show up as white)
+    if vmin is not None:
+        da = da.clip(min=vmin)
+
+    if vmax is not None:
+        da = da.clip(max=vmax)
+
+    # Make plot
+    p = da.plot.contourf(**plot_args)
+
+    # Draw contour lines with hardcoded expectations for certain custom cmaps.
+    if cmap_string == 'beta_star':
+        da_for_lines = (da >= 0).astype(int)
+        lines = da_for_lines.plot.contour(ax=ax, transform=crs, colors='black', linewidths=0.5, levels=1)
+
+    if cmap_string in ['Ks', 'Ks_diff']:
+        da_for_lines = da.notnull().astype(int)
+        lines = da_for_lines.plot.contour(ax=ax, transform=crs, colors='black', linewidths=0.5, levels=1)
+
+    # Center the colormap about 0
+    if vmin is not None and vmax is not None:
+
+        ticks = np.linspace(vmin, vmax, n_levels)
+        cbar = p.colorbar
+
+        tick_locations = []
+        tick_labels = []
+
+        tick_locations.append(vmin)
+        tick_labels.append(f'{vmin:.1f}')
+
+        for i in range(n_levels):
+
+            # Skip ends.
+            if i == 0 or i == (n_levels - 1):
+                continue
+
+            # Display 0 at center.
+            if cmap_center is True and i == (n_levels / 2) - 1:
+                tick_locations.append(0)
+                tick_labels.append('0')
+                continue
+
+            # Don't display a value directly adjacent to 0.
+            if cmap_center is True and i == (n_levels / 2):
+                continue
+
+            if i < (n_levels / 2):
+                if i % 2 == 1:
+                    continue
+                tick_locations.append(ticks[i])
+                tick_labels.append(f'{ticks[i]:.1f}')
+
+            elif i > ((n_levels - 1) / 2):
+                if i % 2 != 1:
+                    continue
+                tick_locations.append(ticks[i])
+                tick_labels.append(f'{ticks[i]:.1f}')
+
+        if cmap_string == 'beta_star':
+            tick_labels[0] = ''
+
+        tick_locations.append(vmax)
+        tick_labels.append(f'{vmax:.1f}')
+
+        cbar.set_ticks(tick_locations)
+        cbar.set_ticklabels(tick_labels)
+
+        if cmap_label is not None:
+            cbar.set_label(cmap_label, size=12)  # , weight='bold')
+
+    ax.coastlines()
+
+    # Draw square if a region is specified (e.g. nino 3.4)
+    if region is not None:
+        rect = mpatches.Rectangle((region['lonmin'], region['latmin']),
+                                  width=(region['lonmax'] - region['lonmin']),
+                                  height=(region['latmax'] - region['latmin']),
+                                  color='black', fill=None, linewidth=0.5, alpha=0.75, zorder=1000,
+                                  transform=ccrs.PlateCarree())
+
+        ax.add_patch(rect)  # Add patch
+
+    plt.title(f'{title}')
+
+    # Add label to bottom right
+    lower_left_values_label = f'max:\nmin:'
+    lower_left_values_text = f'{max_value:.3f}\n{min_value:.3f}'
+
+    if topleft_label is not None:
+        ax.text(0.000001, 0.99999, topleft_label, ha='left', va='bottom', fontweight='bold', transform=ax.transAxes)
+
+    if bottomright_label is not None:
+        ax.text(0.99, 0.01, bottomright_label, ha='right', va='bottom', fontweight='bold', transform=ax.transAxes)
+
+    top_right_values_label = f'mean:\nstdev:'
+    top_right_values_text = f'{avg_value:.3f}\n{std_value:.3f}'
+
+    ax.text(0.01, 0.01, lower_left_values_label, ha='left', va='bottom', fontweight='bold', transform=ax.transAxes)
+    ax.text(0.15, 0.01, lower_left_values_text, ha='right', va='bottom', fontweight='bold', transform=ax.transAxes)
+
+    ax.text(0.85999, 0.99999, top_right_values_label, ha='left', va='bottom', fontweight='bold', transform=ax.transAxes)
+    ax.text(1.000001, .99999, top_right_values_text, ha='right', va='bottom', fontweight='bold', transform=ax.transAxes)
+
+    # Place title and subtitle
+    plt.title(f'{title}\n', pad=12)
+    ax.text(0.5, 1, subtitle, ha='center', va='bottom', fontweight='bold', transform=ax.transAxes)
+
+    # Add shaded layer based on threshold.
+    if shading is not None:
+
+        # Convert values to binary 0-1
+        shading = (shading <= shading_threshold).astype(int)
+
+        p = shading.plot.contourf(colors='None',
+                                  hatches=['', '...'],
+                                  levels=[0, 0.5, 1],
+                                  add_colorbar=False,
+                                  add_labels=False,
+                                  ax=ax,
+                                  transform=crs)
+
+    return plt
+
+
 def plot_index_spaghetti(ufs_stats: dict,
                          verif_stats: dict,
                          calc_anomaly=True,
@@ -427,30 +853,29 @@ def plot_index_spaghetti(ufs_stats: dict,
 
             x_values = forecast_times
 
+            # If plotting anomaly, draw a zero line.
+            zero_line_properties = {
+                'y': 0,
+                'color': 'lightgrey',
+                'linestyle': 'solid',
+                'linewidth': 0.2,
+                'zorder': -1000}
+
+            if len(decade_batches) == 1:
+                axs.axhline(**zero_line_properties)
+            else:
+                axs[this_decade_index].axhline(**zero_line_properties)
+
             if calc_anomaly is False:
                 # Compute index (region was already sliced)
                 y_values = ufs_index.sel(member=this_member).values
 
-                # y_values is a lists of sublists, where each sublist represents the leads for an init
+                # y_values is a list of lists, where each sublist represents the leads for an init
                 # Flatten that list:
                 y_values = [item for sublist in y_values for item in sublist]
 
             # Calculate anomaly
             elif calc_anomaly is True:
-
-                # If plotting anomaly, draw a zero line.
-                zero_line_properties = {
-                    'y': 0,
-                    'color': 'lightgrey',
-                    'linestyle': 'solid',
-                    'linewidth': 0.2,
-                    'zorder': -1000}
-
-                if len(decade_batches) == 1:
-                    axs.axhline(**zero_line_properties)
-                else:
-                    axs[this_decade_index].axhline(**zero_line_properties)
-
                 # Calculate the anomaly
                 # ufs_climatology_ens_mean_values = []
                 y_values = []
@@ -936,4 +1361,153 @@ def plot_rmse_spread(rmses: dict,
 
     ax.set_title(f"{title}")
 
+    return plt
+
+
+def plot_acc_heatmap(ufs_da: xr.DataArray,
+                     verif_da: xr.DataArray,
+                     title='',
+                     sigalpha=0.05,
+                     dpi=300):
+    '''
+    Calculate Pearson Correlation Coefficient (in our case this the Anomaly Correlation Coefficient).
+    DataArray with init+lead vs DataArray with time dimensions.
+    sigalpha is significance level, used for plotting purposes.
+    '''
+
+    if 'init' not in ufs_da.dims or 'lead' not in ufs_da.dims:
+        raise ValueError(f'ufs_da must have init and lead dimensions, got {ufs_da.dims}')
+
+    if 'time' not in verif_da.dims:
+        raise ValueError(f'verif_da must have time dimension, got {verif_da.dims}')
+
+    # ---------------------------------
+    # Calculate ACC
+    # ---------------------------------
+
+    # Get all inits and leads
+    all_inits = list(ufs_da.init.values)
+    all_leads = list(ufs_da.lead.values)
+
+    # Get calendar months
+    all_init_months = list(set([pd.to_datetime(this_init).month for this_init in all_inits]))
+
+    # Initialize accs
+    accs = dict.fromkeys(all_init_months)
+    ps = dict.fromkeys(all_init_months)
+
+    # Calculate acc per calendar month per lead
+    for i in range(len(all_init_months)):
+
+        # Get this calendar month and all the exact init values corresponding to it.
+        this_init_month = all_init_months[i]
+        these_inits = [this_init for this_init in all_inits if pd.to_datetime(this_init).month == this_init_month]
+
+        # These lists store results temporarily.
+        accs_for_this_init_month = []
+        p_for_this_init_month = []
+
+        # Loop over leads
+        for j in range(len(all_leads)):
+            this_lead = all_leads[j]
+
+            # Get UFS 1-d array
+            all_ufs_values = [ufs_da.sel(init=this_init, lead=this_lead).values.item()
+                              for this_init in these_inits]
+
+            # Get VERIF 1-d array
+            all_verif_values = []
+            for this_init in these_inits:
+
+                # forward project to get time value.
+                # By nature of ACC heatmap, we can assume monthly resolution.
+                this_time = timeutil.time_offset(freq_unit='MS',
+                                                 init=this_init,
+                                                 lead=this_lead,
+                                                 step=np.timedelta64(30, 'D'),
+                                                 direction='forward')
+
+                # Get value for this time.
+                all_verif_values.append(verif_da.sel(time=this_time).values.item())
+
+            # Sanity check
+            if len(all_ufs_values) != len(all_verif_values):
+                msg = f'Differing lengths for UFS values {len(all_ufs_values)} '
+                msg += f'and VERIF values {len(all_verif_values)} trying to calculate ACC.'
+                raise ValueError(msg)
+
+            # Compute Pearson Correlation Coefficient
+            r, p_value = scipy.stats.pearsonr(all_ufs_values, all_verif_values)
+
+            # Append results to this calendar month
+            accs_for_this_init_month.append(r)
+            p_for_this_init_month.append(p_value)
+
+        # Store results
+        accs[this_init_month] = accs_for_this_init_month
+        ps[this_init_month] = p_for_this_init_month
+
+    # ---------------------------------
+    # Plot ACC Heatmap
+    # ---------------------------------
+
+    # Create skill mesh for plotting, insert values
+    skill_mesh = np.full((12, 12), np.nan)
+    p_mesh = np.full((12, 12), np.nan)
+
+    # Insert values into mesh
+    for this_acc in accs.keys():
+        skill_mesh[:, this_acc] = accs[this_acc]
+        p_mesh[:, this_acc] = ps[this_acc]
+
+    # Initialize figure
+    fig, ax = plt.subplots(figsize=(7, 5), dpi=dpi)
+
+    # Colormesh
+    pcm = ax.pcolormesh(skill_mesh, cmap=plt.cm.RdYlBu_r, vmin=-1.0, vmax=1.0)
+    fig.colorbar(pcm, ax=ax, ticks=[-1.0, -0.6, -0.2, 0.2, 0.6, 1.0], format='%.1f')
+
+    # Define tick marks.  We engage in a little tick-mark fudgery for extra readability.
+    # x - calendar months 1-12
+    xtick_values = np.arange(1, 14) + 0.5
+    xtick_labels = [str(this) for this in np.arange(1, 14)]
+
+    # y - leads 0-11
+    ytick_values = np.arange(0, 12) + 0.5
+    ytick_labels = [str(this) for this in np.arange(0, 12)]
+
+    # Set ticks
+    plt.xticks(ticks=xtick_values, labels=xtick_labels)
+    plt.yticks(ticks=ytick_values, labels=ytick_labels)
+
+    # Set range
+    plt.xlim(1, 13)
+
+    # Set title and labels
+    title = title.strip()  # strip white space
+    if title == '':
+        title = 'ACC'  # Default plot title
+
+    plt.title(title)
+    plt.xlabel("Initial Month")
+    plt.ylabel("Lead Time (Months)")
+
+    # Add ACC value labels
+    for i in range(skill_mesh.shape[0]):
+        for j in range(skill_mesh.shape[1]):
+
+            # this ACC value
+            acc_val = skill_mesh[i, j]
+
+            # Only print ACC value if p-value <= sigalpha
+            if not np.isnan(acc_val) and p_mesh[i][j] <= sigalpha:
+                # Center the text in the middle of the cell
+                text_x = j + 0.5
+                text_y = i + 0.5
+
+                ax.text(text_x, text_y, f"{acc_val:.1f}",
+                        ha='center', va='center',
+                        color='black', fontweight='light', fontsize=8)
+
+    # Done with work
     return plt
