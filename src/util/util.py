@@ -16,6 +16,7 @@ def retrieve_ufs_dataset(ufs_data_reader,
                          time_range: tuple[str, str],
                          members: list[int],
                          region: dict = None,
+                         method=None,
                          **kwargs) -> xr.Dataset:
     '''
     This function is a wrapper around UFS_DataReader.retrieve()
@@ -34,17 +35,30 @@ def retrieve_ufs_dataset(ufs_data_reader,
     if region is None:
         region = {'latmin': -90, 'latmax': 90, 'lonmin': 0, 'lonmax': 360}
 
+    # Lat -- if max is not populated, query single value, otherwise slice.  Then we can make use of 'nearest'.
+    if region.get('latmax') is None:
+        get_this_lat = region['latmin']
+    else:
+        get_this_lat = (region['latmin'], region['latmax'])
+
+    # Lon -- if max is not populated, query single value, otherwise slice.  Then we can make use of 'nearest'.
+    if region.get('lonmax') is None:
+        get_this_lon = region['lonmin']
+    else:
+        get_this_lon = (region['lonmin'], region['lonmax'])
+
     datasets = []
     for i in range(len(members)):
 
         this_member = members[i]
-        print(f'retrieving {this_member}')
 
         if this_member == 'ens_avg':
             this_ds = ufs_data_reader.retrieve(
                 var=ufs_var,
-                lat=(region['latmin'], region['latmax']),
-                lon=(region['lonmin'], region['lonmax']),
+                # lat=(region['latmin'], region['latmax']),
+                # lon=(region['lonmin'], region['lonmax']),
+                lat=get_this_lat,
+                lon=get_this_lon,
                 time=time_range,
                 ens_avg=True,
                 **kwargs
@@ -57,8 +71,10 @@ def retrieve_ufs_dataset(ufs_data_reader,
         else:
             this_ds = ufs_data_reader.retrieve(
                 var=ufs_var,
-                lat=(region['latmin'], region['latmax']),
-                lon=(region['lonmin'], region['lonmax']),
+                # lat=(region['latmin'], region['latmax']),
+                # lon=(region['lonmin'], region['lonmax']),
+                lat=get_this_lat,
+                lon=get_this_lon,
                 time=time_range,
                 member=this_member,
                 **kwargs
@@ -118,6 +134,10 @@ def combine_ufs_means(ufs_experiments_list: list[str],
         this_ds = this_ds.assign_coords(member=('member', [this_member]))
 
         this_ds = this_ds.rename_vars({ufs_var: ufs_vars_list[0]})
+
+        # If there is only 1 lat/lon value, then flatten. Beware of possible risks.
+        if kwargs.get('flatten', False) is True and len(this_ds.lat.values) == 1:
+            this_ds = this_ds.squeeze(['lat', 'lon', 'lev']).drop_vars(['lat', 'lon', 'lev'])
 
         ds_list.append(this_ds)
 
@@ -186,3 +206,24 @@ def print_fixed_width(list_of_strings: list[str]) -> str:
     df.columns = [''] * n_cols
 
     return df.to_string(index=False)
+
+
+def add_month_number(month_number, lead):
+    '''Add integer to a month number to get a new month number
+       E.g., month_number=11, lead=2 -> new month_number=1
+    '''
+    if month_number < 1 or month_number > 12:
+        raise ValueError(f'month_number must be between 1 and 12, got {month_number}')
+
+    if lead < 0:
+        raise ValueError(f'lead must be > 0, got {lead}')
+
+    new_month_number = month_number + lead
+
+    if new_month_number > 12:
+        if new_month_number % 12 == 0:
+            new_month_number = (new_month_number - 1) % 12 + 1
+        else:
+            new_month_number = new_month_number % 12
+
+    return new_month_number

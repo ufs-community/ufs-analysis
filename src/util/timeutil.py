@@ -8,6 +8,12 @@ import xarray as xr
 
 
 def time_offset(freq_unit: str, init: str, lead: int, step: np.timedelta64, direction='forward') -> np.timedelta64:
+    '''
+    freq_unit = 'MS'
+    init      = numpy.datetime64('1994-11-01T00:00:00.000000000')
+    lead      = 1
+    step      = np.timedelta64(30, 'D')
+    '''
 
     if direction == 'backward':
         direction_op = operator.sub
