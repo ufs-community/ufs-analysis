@@ -33,7 +33,7 @@ class UFS_DataReader(DataReader):
         self.experiment = kwargs.get('experiment', 'baseline')  # <-- unique to UFS
         self.model = model  # <-- unique to UFS, atm or ocn
         self._base_url = 's3://noaa-oar-sfsdev-pds/'
-        self._default_file = f'experiments/phase_1/{self.experiment}/atm_monthly.zarr'
+        self._default_file = f'experiments/phase_1/{self.experiment}/{self.model}_monthly.zarr'
 
         super().__init__(file_url=file_url)
 
