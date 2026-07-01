@@ -451,7 +451,7 @@ class DataReader(ABC):
         # Model-specific vertical selection
         model_dims = self.get_vertical_dims()
 
-        lev = params['lev']
+        lev = params['lev']  # default is None
         # For UFS levels
         if "level_dim" in model_dims and lev is not None and model_dims["level_dim"] in data.dims:
             # print(f"Slicing by model dimension {model_dims['level_dim']}")

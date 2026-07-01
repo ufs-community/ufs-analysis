@@ -32,7 +32,8 @@ def resample(ds: xr.Dataset, timeslice: Tuple[str, ...], freq) -> xr.Dataset:
 
 def calc_climatology_anomaly(ds: xr.Dataset,
                              area_mean=False,
-                             use_member_climatology=True) -> dict:
+                             use_member_climatology=True,
+                             freq_unit = 'MS') -> dict:
 
     '''
     Compute longterm, area-based, monthly climatologies.
@@ -59,7 +60,7 @@ def calc_climatology_anomaly(ds: xr.Dataset,
 
     # Get monthly mean if this is time-based data (i.e., not UFS which is already monthly meaned)
     if 'time' in ds.dims:
-        ds = ds.resample(time='MS').mean()
+        ds = ds.resample(time=freq_unit).mean()
 
     # Compute area mean and std
     if area_mean is True:
@@ -1062,6 +1063,11 @@ def calc_rmse_spread(ufs_ds: xr.Dataset,
                      verif_var: str,
                      verif_stats: dict) -> dict:
 
+    # First step, check if we're dealing with a single coordinate location or an array.
+    singleton = True
+    if len(ufs_ds.lat.values) > 1 or len(ufs_ds.lon.values) > 1:
+        singleton = False
+
     # Get lead resolution of UFS
     freq_unit, step = timeutil.get_lead_resolution(ufs_ds)
 
@@ -1115,7 +1121,10 @@ def calc_rmse_spread(ufs_ds: xr.Dataset,
         this_ufs_index = this_ufs_index[0]  # It should be a length-1 array.
 
         # Get this UFS climatology (based on the Ensemble mean)
-        this_ufs_climatology = ufs_stats['climatology_mean'].sel(member=-1, month=initmonth, lead=lead).values.item()
+        if singleton:
+            this_ufs_climatology = ufs_stats['climatology_mean'].sel(member=-1, month=initmonth, lead=lead).values.item()
+        else:
+            this_ufs_climatology = ufs_stats['climatology_mean'].sel(member=-1, month=initmonth, lead=lead).values
 
         # Calculate this UFS anomaly
         this_ufs_index -= this_ufs_climatology
@@ -1134,7 +1143,11 @@ def calc_rmse_spread(ufs_ds: xr.Dataset,
             forecast_month = (forecast_month % 12) + 1
 
             # Get Observed value
-            this_observed_index = verif_stats['monthly_mean'].sel(time=forecast_time).values.item()
+            if singleton:
+                this_observed_index = verif_stats['monthly_mean'].sel(time=forecast_time).values.item()
+            else:
+                print(forecast_time)
+                this_observed_index = verif_stats['monthly_mean'].sel(time=forecast_time).values
 
             # Get this Era5 climatology
             this_verif_climatology = verif_stats['climatology_mean'].sel(month=forecast_month).values
@@ -1154,7 +1167,12 @@ def calc_rmse_spread(ufs_ds: xr.Dataset,
 
             # Get next member's index and anomaly
             next_member_ufs_index = ufs_stats['monthly_mean'].sel(lead=lead, member=next_member)
-            next_member_ufs_index = next_member_ufs_index.where(ufs_mask, drop=True).values[0]
+
+            if singleton:
+                next_member_ufs_index = next_member_ufs_index.where(ufs_mask, drop=True).values[0]
+            else:
+                next_member_ufs_index = next_member_ufs_index.where(ufs_mask, drop=True).values
+
             next_member_ufs_index -= this_ufs_climatology
 
             # Calculate distance and square the result
@@ -1217,6 +1235,7 @@ def calc_rmse_spread(ufs_ds: xr.Dataset,
             spread_sum_total *= spread_coef
 
             # Take square root
+            print(rmse_sum_total)
             rmse_sum_total_sqrt = math.sqrt(rmse_sum_total)
             spread_sum_total_sqrt = math.sqrt(spread_sum_total)
 
