@@ -32,7 +32,8 @@ def resample(ds: xr.Dataset, timeslice: Tuple[str, ...], freq) -> xr.Dataset:
 
 def calc_climatology_anomaly(ds: xr.Dataset,
                              area_mean=False,
-                             use_member_climatology=True) -> dict:
+                             use_member_climatology=True,
+                             freq_unit = 'MS') -> dict:
 
     '''
     Compute longterm, area-based, monthly climatologies.
@@ -59,7 +60,7 @@ def calc_climatology_anomaly(ds: xr.Dataset,
 
     # Get monthly mean if this is time-based data (i.e., not UFS which is already monthly meaned)
     if 'time' in ds.dims:
-        ds = ds.resample(time='MS').mean()
+        ds = ds.resample(time=freq_unit).mean()
 
     # Compute area mean and std
     if area_mean is True:
