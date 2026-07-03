@@ -380,7 +380,8 @@ class DataReader(ABC):
         if lon is not None and 'lon' in data.dims:
             # print('Slicing by lon')
             if isinstance(lon, (tuple, list)):
-                lon = [l % 360 for l in lon]
+                # lon = [l % 360 for l in lon]
+                lon = [l if l <= 360 else l % 360 for l in lon]
 
                 if len(lon) == 1:
                     data = data.sel(lead=[lon[0]], method='nearest')
