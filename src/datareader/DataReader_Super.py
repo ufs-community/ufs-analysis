@@ -170,6 +170,14 @@ class DataReader(ABC):
                 lead_to_move = dims.pop(lead_ind)
                 dims.insert(init_ind + 1, lead_to_move)
 
+        # Insert member into final slot
+        if 'member' in dims:
+            if dims[-1] != 'member':
+                change_order = True
+                member_ind = dims.index('member')
+                member_to_move = dims.pop(member_ind)
+                dims.append(member_to_move)
+
         # Transpose the data.
         # Note that a chunking scheme must be present for large datasets.
         if change_order is True:
