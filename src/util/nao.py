@@ -9,7 +9,7 @@ from typing import Optional, Union, Tuple, List
 import xarray as xr
 import pandas as pd
 
-from . import stats
+from . import stats, timeutil
 
 
 class NAO:
@@ -31,8 +31,13 @@ class NAO:
             raise ValueError(f'da must have either time or init+lead dimensions, got {da.dims}')
 
         self.ds = ds
+
         self.negative_exclude_months = []
         self.positive_exclude_months = []
+
+        self.model_negative_exclude_initleads = []
+        self.model_positive_exclude_initleads = []
+
 
     def calc_phases(self, var):
         if self.data_type == 'verif':
@@ -60,40 +65,33 @@ class NAO:
         # This is an *exclusionary* list due to downstream analysis codes; easier this way.
 
         # This is when ERA5 NAO is positive or negative
-        era5_positive_exclude_initleads = []
-        era5_negative_exclude_initleads = []
+        positive_exclude_initleads = []
+        negative_exclude_initleads = []
 
-        for this_time in era5_ds_nao.time.values:
+        for this_init in nao_da.init.values:
+            for this_lead in nao_da.lead.values:
 
-            # Get calendar month number
-            this_month_number = pd.to_datetime(this_time).month
+                # This NAO value
+                this_nao_value = nao_da.sel(init=this_init, lead=this_lead).values.item()
+                # Is this NAO value non-positive or non-negative?
+                if this_nao_value >= 0:
+                    negative_exclude_initleads.append((this_init, this_lead))
 
-            # Calculate lead. two cases for handling calendar months
-            if this_month_number >= initmonth:
-                this_lead = this_month_number - initmonth
-            else:
-                this_lead = this_month_number + (12-initmonth)
+                elif this_nao_value <= 0:
+                    positive_exclude_initleads.append((this_init, this_lead))
 
-            # Get the corresponding init time
-            this_init = timeutil.time_offset(freq_unit='MS',
-                                             init=this_time,
-                                             lead=this_lead,
-                                             step=np.timedelta64(30, 'D'),
-                                             direction='backward')
-            # This NAO value
-            this_nao_value = era5_ds_nao[era5_var].sel(time=this_time).values.item()
+        # Assign results to self
+        self.model_negative_exclude_initleads = negative_exclude_initleads
+        self.model_positive_exclude_initleads = positive_exclude_initleads
 
-            # Is this NAO value non-positive or non-negative?
-            if this_nao_value >= 0:
-                era5_negative_exclude_initleads.append((this_init, this_lead))
-
-            elif this_nao_value <= 0:
-                era5_positive_exclude_initleads.append((this_init, this_lead))
+        # Reset to null
+        self.negative_exclude_months = []
+        self.positive_exclude_months = []
 
         print('Results stored in:')
-        print('<self>.model_positive_exclude_months')
+        print('<self>.model_positive_exclude_initleads')
         print('and')
-        print('<self>.model_negative_exclude_months')
+        print('<self>.model_negative_exclude_initleads')
 
     def _calc_phases_verif(self, var):
 
@@ -130,6 +128,10 @@ class NAO:
         # Assign results to self
         self.verif_negative_exclude_months = negative_exclude_months
         self.verif_positive_exclude_months = positive_exclude_months
+
+        # Reset to null
+        self.model_negative_exclude_initleads = []
+        self.model_positive_exclude_initleads = []
 
         print('Results stored in:')
         print('<self>.verif_positive_exclude_months')
