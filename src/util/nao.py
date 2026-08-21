@@ -50,14 +50,14 @@ class NAO:
         stats_1 = stats.calc_climatology_anomaly(ds_1, area_mean=False, use_member_climatology=False)
         stats_2 = stats.calc_climatology_anomaly(ds_2, area_mean=False, use_member_climatology=False)
 
-        da_1 = stats.normalize(da=stats_1[var], stats=stats_1)
-        da_2 = stats.normalize(da=stats_2[var], stats=stats_2)
+        da_1 = stats.normalize(da=ds_1[var], stats=stats_1)
+        da_2 = stats.normalize(da=ds_2[var], stats=stats_2)
 
         nao_da = (da_2 - da_1)
 
         # This list shows when monthly NAO is positive or negative.
-        # It is a list of np.datetime64 objects, like:
-        # [(numpy.datetime64('1994-05-01T00'), ...]
+        # It is a list of tuples like this: (np.datetime64, this_init, this_lead)
+        # e.g. [(numpy.datetime64('1994-05-01T00', 11, 2), ...]
         # This is an *exclusionary* list due to downstream analysis codes; easier this way.
 
         # This is when ERA5 NAO is positive or negative
@@ -69,6 +69,7 @@ class NAO:
 
                 # This NAO value
                 this_nao_value = nao_da.sel(init=this_init, lead=this_lead).values.item()
+
                 # Is this NAO value non-positive or non-negative?
                 if this_nao_value >= 0:
                     negative_exclude_initleads.append((this_init, this_lead))
