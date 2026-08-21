@@ -23,21 +23,17 @@ class NAO:
 
         if 'init' in ds.dims and 'lead' in ds.dims:
             self.data_type = 'model'
+            self.negative_exclude_initleads = []
+            self.positive_exclude_initleads = []
 
         elif 'time' in ds.dims:
             self.data_type = 'verif'
-
+            self.negative_exclude_months = []
+            self.positive_exclude_months = []
         else:
             raise ValueError(f'da must have either time or init+lead dimensions, got {da.dims}')
 
         self.ds = ds
-
-        self.negative_exclude_months = []
-        self.positive_exclude_months = []
-
-        self.model_negative_exclude_initleads = []
-        self.model_positive_exclude_initleads = []
-
 
     def calc_phases(self, var):
         if self.data_type == 'verif':
@@ -81,17 +77,13 @@ class NAO:
                     positive_exclude_initleads.append((this_init, this_lead))
 
         # Assign results to self
-        self.model_negative_exclude_initleads = negative_exclude_initleads
-        self.model_positive_exclude_initleads = positive_exclude_initleads
-
-        # Reset to null
-        self.negative_exclude_months = []
-        self.positive_exclude_months = []
+        self.negative_exclude_initleads = negative_exclude_initleads
+        self.positive_exclude_initleads = positive_exclude_initleads
 
         print('Results stored in:')
-        print('<self>.model_positive_exclude_initleads')
+        print('<self>.positive_exclude_initleads')
         print('and')
-        print('<self>.model_negative_exclude_initleads')
+        print('<self>.negative_exclude_initleads')
 
     def _calc_phases_verif(self, var):
 
@@ -130,13 +122,13 @@ class NAO:
         self.verif_positive_exclude_months = positive_exclude_months
 
         # Reset to null
-        self.model_negative_exclude_initleads = []
-        self.model_positive_exclude_initleads = []
+        self.negative_exclude_initleads = []
+        self.positive_exclude_initleads = []
 
         print('Results stored in:')
-        print('<self>.verif_positive_exclude_months')
+        print('<self>.positive_exclude_months')
         print('and')
-        print('<self>.verif_negative_exclude_months')
+        print('<self>.negative_exclude_months')
 
 
 
