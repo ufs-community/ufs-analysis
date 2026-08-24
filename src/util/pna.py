@@ -47,6 +47,7 @@ class PNA:
 
     def _calc_phases_model(self, var):
 
+        # Assume lev dimension has already been selected and squeezed out.
         ds_1 = self.ds[[var]].sel(lat=self.REGION_1['latmin'], lon=self.REGION_1['lonmin'], method='nearest').load()
         ds_2 = self.ds[[var]].sel(lat=self.REGION_2['latmin'], lon=self.REGION_2['lonmin'], method='nearest').load()
         ds_3 = self.ds[[var]].sel(lat=self.REGION_3['latmin'], lon=self.REGION_3['lonmin'], method='nearest').load()
@@ -64,7 +65,7 @@ class PNA:
         da_4 = stats.normalize(da=ds_2[var], stats=stats_2)
 
         # Calculate PNA
-        pna_da = 0.25 * (da_1 - da_2 + da_3 - da_4).to_dataset()
+        pna_da = 0.25 * (da_1 - da_2 + da_3 - da_4)
 
         # This list shows when monthly PNA is positive or negative.
         # It is a list of tuples like this: (np.datetime64, this_init, this_lead)
@@ -101,8 +102,11 @@ class PNA:
 
         # Loading vertical verification data (e.g. from ERA5) is inherently inefficient.
         # Load all lats and lons into memory first, then split into 4 locations.
-        all_lats = [this_region['latmin'] for this_region in [region_1, region_2, region_3, region_4]]
-        all_lons = [this_region['lonmin'] for this_region in [region_1, region_2, region_3, region_4]]
+        all_lats = [this_region['latmin'] for this_region\
+            in [self.REGION_1, self.REGION_2, self.REGION_3, self.REGION_4]]
+
+        all_lons = [this_region['lonmin'] for this_region\
+            in [self.REGION_1, self.REGION_2, self.REGION_3, self.REGION_4]]
 
         # Find nearest lats and lons
         all_lats = [self.ds.sel(lat=this_lat, method='nearest').lat.values.tolist()
@@ -115,16 +119,15 @@ class PNA:
         all_lats_da = xr.DataArray(all_lats, dims='lat')
         all_lons_da = xr.DataArray(all_lons, dims='lon')
 
-        ds_1234 = era5_data_reader.dataset().sel(lat=all_lats_da,
-                                                 lon=all_lons_da,
-                                                 lev=lev,
-                                                 time=slice(time_range[0], time_range[1]))[[var]].load()  # load
+        # Assume lev dimension has already been selected and squeezed out.
+        ds_1234 = self.ds.sel(lat=all_lats_da,
+                              lon=all_lons_da)[[var]].load()  # load
 
         # Split into localities.
-        ds_1 = ds_1234[[var]].sel(lat=[all_lats[0]], lon=[all_lons[0]]).load()
-        ds_2 = ds_1234[[var]].sel(lat=[all_lats[1]], lon=[all_lons[1]]).load()
-        ds_3 = ds_1234[[var]].sel(lat=[all_lats[2]], lon=[all_lons[2]]).load()
-        ds_4 = ds_1234[[var]].sel(lat=[all_lats[3]], lon=[all_lons[3]]).load()
+        ds_1 = ds_1234[[var]].sel(lat=all_lats[0], lon=all_lons[0]).load()
+        ds_2 = ds_1234[[var]].sel(lat=all_lats[1], lon=all_lons[1]).load()
+        ds_3 = ds_1234[[var]].sel(lat=all_lats[2], lon=all_lons[2]).load()
+        ds_4 = ds_1234[[var]].sel(lat=all_lats[3], lon=all_lons[3]).load()
 
         stats_1 = stats.calc_climatology_anomaly(ds_1, area_mean=False)
         stats_2 = stats.calc_climatology_anomaly(ds_2, area_mean=False)
@@ -134,11 +137,11 @@ class PNA:
         # Normalize the data. z = (X - mu) / sigma
         da_1 = stats.normalize(da=stats_1['monthly_mean'], stats=stats_1)
         da_2 = stats.normalize(da=stats_2['monthly_mean'], stats=stats_2)
-        da_3 = stats.normalize(da=stats_2['monthly_mean'], stats=stats_3)
-        da_4 = stats.normalize(da=stats_2['monthly_mean'], stats=stats_4)
+        da_3 = stats.normalize(da=stats_3['monthly_mean'], stats=stats_3)
+        da_4 = stats.normalize(da=stats_4['monthly_mean'], stats=stats_4)
 
         # Calculate PNA
-        pna_da = 0.25 * (da_1 - da_2 + da_3 - da_4).to_dataset()
+        pna_da = 0.25 * (da_1 - da_2 + da_3 - da_4)
 
         # This list shows when monthly PNA is positive or negative.
         # It is a list of np.datetime64 objects, like:
