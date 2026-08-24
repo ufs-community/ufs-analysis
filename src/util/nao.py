@@ -133,6 +133,10 @@ class NAO:
     def convert_to_initlead(self, initmonth):
         self.negative_exclude_initleads = self._convert_to_initlead(self.negative_exclude_months, initmonth)
         self.positive_exclude_initleads = self._convert_to_initlead(self.positive_exclude_months, initmonth)
+        print('Results stored in:')
+        print('<self>.positive_exclude_initleads')
+        print('and')
+        print('<self>.negative_exclude_initleads')
 
     def _convert_to_initlead(self, timelist, initmonth):
 
