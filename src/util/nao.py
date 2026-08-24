@@ -1,7 +1,7 @@
 # ---------------------------------------------------------------------------------------------------------------------
 #  Filename: nao.py
 #  Created by: Tariq Hamzey, Cristiana Stan
-#  Created on: 19 Sept. 2025
+#  Created on: 21 Aug. 2026
 #  Purpose: Calculate positive and negative NAO phases.
 # ---------------------------------------------------------------------------------------------------------------------
 
@@ -155,7 +155,7 @@ class NAO:
             if this_month_number >= initmonth:
                 this_lead = this_month_number - initmonth
             else:
-                this_lead = this_month_number + (12-initmonth)
+                this_lead = this_month_number + (12 - initmonth)
 
             # Get the corresponding init time
             this_init = timeutil.time_offset(freq_unit='MS',
@@ -168,39 +168,3 @@ class NAO:
 
         # Return results
         return initlead_list
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
