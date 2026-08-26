@@ -102,11 +102,11 @@ class PNA:
 
         # Loading vertical verification data (e.g. from ERA5) is inherently inefficient.
         # Load all lats and lons into memory first, then split into 4 locations.
-        all_lats = [this_region['latmin'] for this_region\
-            in [self.REGION_1, self.REGION_2, self.REGION_3, self.REGION_4]]
+        all_lats = [this_region['latmin'] for this_region
+                    in [self.REGION_1, self.REGION_2, self.REGION_3, self.REGION_4]]
 
-        all_lons = [this_region['lonmin'] for this_region\
-            in [self.REGION_1, self.REGION_2, self.REGION_3, self.REGION_4]]
+        all_lons = [this_region['lonmin'] for this_region
+                    in [self.REGION_1, self.REGION_2, self.REGION_3, self.REGION_4]]
 
         # Find nearest lats and lons
         all_lats = [self.ds.sel(lat=this_lat, method='nearest').lat.values.tolist()
