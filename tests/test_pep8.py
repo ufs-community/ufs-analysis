@@ -27,6 +27,9 @@ def test_pep8():
     # Iterate over repo directory
     for dir_path, dir_names, filenames in os.walk(parent_dir):
 
+        if '.ipynb_checkpoints' in dir_path:
+            continue
+
         # Iterate over files in the directory
         for filename in filenames:
 
@@ -42,7 +45,7 @@ def test_pep8():
 
     # Check that we'll validating all Python files in our repo.
     # You will need to adjust this number if/when more Python files are created in the future.
-    n_python_files_in_repository = 23
+    n_python_files_in_repository = 25
     assert len(py_file_list) == n_python_files_in_repository
 
     # Get config file and define style
