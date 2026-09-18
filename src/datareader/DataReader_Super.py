@@ -170,6 +170,14 @@ class DataReader(ABC):
                 lead_to_move = dims.pop(lead_ind)
                 dims.insert(init_ind + 1, lead_to_move)
 
+        # Insert member into final slot
+        if 'member' in dims:
+            if dims[-1] != 'member':
+                change_order = True
+                member_ind = dims.index('member')
+                member_to_move = dims.pop(member_ind)
+                dims.append(member_to_move)
+
         # Transpose the data.
         # Note that a chunking scheme must be present for large datasets.
         if change_order is True:
@@ -380,7 +388,8 @@ class DataReader(ABC):
         if lon is not None and 'lon' in data.dims:
             # print('Slicing by lon')
             if isinstance(lon, (tuple, list)):
-                lon = [l % 360 for l in lon]
+                # lon = [l % 360 for l in lon]
+                lon = [l if l <= 360 else l % 360 for l in lon]
 
                 if len(lon) == 1:
                     data = data.sel(lead=[lon[0]], method='nearest')
