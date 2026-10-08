@@ -30,10 +30,19 @@ class UFS_DataReader(DataReader):
         if model not in allowed_models:
             raise ValueError(f'Must supply model= one of {", ".join(allowed_models)}')
 
+        freq = kwargs.get('freq', None)
+        if freq is None:
+            print(f"freq: deferring to 'monthly' forecast data")
+            freq = 'monthly'
+        allowed_freqs = ['monthly', 'daily']
+        if freq not in allowed_freqs:
+            raise ValueError(f"'freq' must be one of {', '.join(allowed_freqs)} or None")
+
         self.experiment = kwargs.get('experiment', 'baseline')  # <-- unique to UFS
         self.model = model  # <-- unique to UFS, atm or ocn
+        self.freq = freq
         self._base_url = 's3://noaa-oar-sfsdev-pds/'
-        self._default_file = f'experiments/phase_1/{self.experiment}/atm_monthly.zarr'
+        self._default_file = f'experiments/phase_1/{self.experiment}/{self.model}_{self.freq}.zarr'
 
         super().__init__(file_url=file_url)
 

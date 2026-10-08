@@ -237,11 +237,12 @@ class DataReader(ABC):
     def get_vertical_dims(self) -> dict:
         # These are UFS models, other systems may not have definitions and that's okay.
         models = {
-            "atm": {"level_dim": "lev", "depth_dim": "depthBelowLandLayer"},
-            "ocn": {"depth_dim": "depth"},
-            "lnd": {"depth_dim": "depthBelowLandLayer"},
-            "ice": {},
-            "wav": {}
+            'atm': {'level_dim': 'lev', 'depth_dim': 'depthBelowLandLayer'},
+            'ocn': {'level_dim': 'lev',
+                    'depth_dim': ['depth', 'deptho', 'depthBelowLandLayer', 'z_l', 'z_i', 'zl', 'zi']},
+            'lnd': {'depth_dim': 'depthBelowLandLayer'},
+            'ice': {},
+            'wav': {}
         }
 
         return models.get(getattr(self, 'model', 'dummy'), {})
@@ -261,7 +262,7 @@ class DataReader(ABC):
 
         # Assume these are the possible vertical coordinates we could encounter.
         # May need to update this if new coordinates are encountered.
-        vertical_dims = {'lev', 'hybrid', 'depth', 'depthBelowLandLayer'}
+        vertical_dims = {'lev', 'hybrid', 'depth', 'deptho', 'depthBelowLandLayer', 'z_l', 'z_i', 'zl', 'zi'}
         vertical_dims_found = []
 
         # null
@@ -460,10 +461,10 @@ class DataReader(ABC):
         # Model-specific vertical selection
         model_dims = self.get_vertical_dims()
 
-        lev = params['lev']
+        lev = params['lev'] # Default None, what about ocean?
         # For UFS levels
         if "level_dim" in model_dims and lev is not None and model_dims["level_dim"] in data.dims:
-            # print(f"Slicing by model dimension {model_dims['level_dim']}")
+            print('__level dim__')
             if isinstance(lev, (tuple, list)):
 
                 if len(lev) == 1:
@@ -476,6 +477,7 @@ class DataReader(ABC):
 
         # For other Vertical levels
         elif lev is not None:
+            print('__lev__')
             vertical_dim = None
 
             if 'hybrid' in data.dims:  # might need to revist this
