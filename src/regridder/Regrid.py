@@ -274,9 +274,9 @@ class Regrid:
         ds_for_resample = data_reader_for_resample.retrieve(var=var_list, lev=lev, time=time)
 
         # preserve these special attributes
-        WINDS = data_reader_for_resample.WINDS
+        UV_FIELDS = data_reader_for_resample.UV_FIELDS
 
-        # This logic depends on retrieve() resetting the coordinates after slicing by a single level
+        # Checking for flatness
         is_flat, _ = data_reader_for_resample.is_flat(dataset=ds_for_resample)
         if is_flat is not True:
             raise KeyError(f'You must specify a single vertical level to resample.')
@@ -284,7 +284,7 @@ class Regrid:
         # Submit data to _resample() method.
         self.resampled = dr.getDataReader(datasource='supplied',
                                           dataset=self._resample(ds_for_resample, use_mp=use_mp),  # computation
-                                          WINDS=WINDS)
+                                          UV_FIELDS=UV_FIELDS)
 
         print(f"Resample results stored in <RegridObj>.resampled")
         return None
@@ -359,7 +359,7 @@ class Regrid:
             data_reader_to_regrid = getattr(self, f'_data_reader{self._highres_grid}')
 
         # This is for checking whether vector data needs to be regridded
-        WINDS = data_reader_to_regrid.WINDS
+        UV_FIELDS = data_reader_to_regrid.UV_FIELDS
 
         run_sphere = False  # <-- Can be toggled TRUE with following logic:
 
@@ -377,8 +377,8 @@ class Regrid:
             elif len(var) == 2:
                 # Then this should be wind vector data.
                 n_uv_in_verif = 0
-                for uvset in WINDS:
-                    uv_in_verif = set([uvset['U_WIND'], uvset['V_WIND']]) & set(var)
+                for uvset in UV_FIELDS:
+                    uv_in_verif = set([uvset['U_FIELD'], uvset['V_FIELD']]) & set(var)
                     n_uv_in_verif = max(n_uv_in_verif, len(uv_in_verif))
 
                 if n_uv_in_verif == 1:
@@ -410,8 +410,8 @@ class Regrid:
 
         # Check if input var are wind vectors
         if isinstance(var, str):
-            for uvset in WINDS:
-                if var in [uvset['U_WIND'], uvset['V_WIND']]:
+            for uvset in UV_FIELDS:
+                if var in [uvset['U_FIELD'], uvset['V_FIELD']]:
                     msg = f'You supplied one wind vector {var} but not the other, so spherical harmonics cannot be run.'
                     raise ValueError(msg)
 
@@ -465,12 +465,12 @@ class Regrid:
         # REGRID SPHERE ##
         if run_sphere is True:
             # Distinguish u from v. At this point we've already confirmed that the correct variables are present.
-            for uvset in WINDS:
+            for uvset in UV_FIELDS:
                 if set(var) == set(list(uvset.values())):
-                    U_WIND_VAR = uvset['U_WIND']
-                    V_WIND_VAR = uvset['V_WIND']
+                    U_FIELD_VAR = uvset['U_FIELD']
+                    V_FIELD_VAR = uvset['V_FIELD']
             # Run sphere
-            to_regrid_ds = self._run_sphere(to_regrid_ds, U_WIND_VAR, V_WIND_VAR)
+            to_regrid_ds = self._run_sphere(to_regrid_ds, U_FIELD_VAR, V_FIELD_VAR)
 
         # REGRID SCALAR ##
         else:
@@ -484,11 +484,11 @@ class Regrid:
         # Return a data_reader object
         self.regridded = dr.getDataReader(datasource='supplied',
                                           dataset=to_regrid_ds,
-                                          WINDS=WINDS)
+                                          UV_FIELDS=UV_FIELDS)
 
         print(f"Regrid results stored in <RegridObj>.regridded")
 
-    def _run_sphere(self, dataset: xr.Dataset, U_WIND_VAR: str, V_WIND_VAR: str) -> xr.Dataset:
+    def _run_sphere(self, dataset: xr.Dataset, U_FIELD_VAR: str, V_FIELD_VAR: str) -> xr.Dataset:
 
         # Our spherepack-based code expects 1 time dimension and no vertical levels of any kind.
         # Therefore, if dealing with init+leads, make a slice at each init,
@@ -510,7 +510,7 @@ class Regrid:
         # Each time slice will be appended here, to be merged at the end.
         results = []
 
-        print(f"Running spherical harmonics on {U_WIND_VAR} and {V_WIND_VAR}")
+        print(f"Running spherical harmonics on {U_FIELD_VAR} and {V_FIELD_VAR}")
         # Iterate
         for this_it_value in iterator_values:
 
@@ -526,8 +526,8 @@ class Regrid:
             dummy_data = np.full(data_shape, np.nan)
 
             # Get u and v input vectors
-            u_input = temp_ds[U_WIND_VAR].values
-            v_input = temp_ds[V_WIND_VAR].values
+            u_input = temp_ds[U_FIELD_VAR].values
+            v_input = temp_ds[V_FIELD_VAR].values
 
             # -----------------
             # REGRID VECTOR U-V
@@ -537,7 +537,7 @@ class Regrid:
             # -----------------
 
             # Drop u-v fields from the dataset. The spherical harmonic results will be added back.
-            temp_ds = temp_ds.drop_vars([U_WIND_VAR, V_WIND_VAR])
+            temp_ds = temp_ds.drop_vars([U_FIELD_VAR, V_FIELD_VAR])
             temp_ds = temp_ds.assign(dummy_variable=(data_dims, dummy_data))
 
             # Run xesmf regridder on dummy data, then drop the dummy data
@@ -563,7 +563,7 @@ class Regrid:
                 temp_ds = temp_ds.assign(v_wind=(('time', 'lat', 'lon'), v_output))
 
             # Rename back to origin names
-            temp_ds = temp_ds.rename({'u_wind': U_WIND_VAR, 'v_wind': V_WIND_VAR})
+            temp_ds = temp_ds.rename({'u_wind': U_FIELD_VAR, 'v_wind': V_FIELD_VAR})
 
             # Append this time slice to the results list.
             results.append(temp_ds)
@@ -699,7 +699,7 @@ class Regrid:
 
         # Extract the underlying xarray dataset
         to_align_ds = to_align_datareader.dataset()
-        WINDS = to_align_datareader.WINDS
+        UV_FIELDS = to_align_datareader.UV_FIELDS
 
         if 'init' in to_align_ds.dims:
             print(f'Dataset already has init+lead dimensions; returning None.')
@@ -806,7 +806,7 @@ class Regrid:
 
         self.aligned = dr.getDataReader(datasource='supplied',
                                         dataset=final,
-                                        WINDS=WINDS)
+                                        UV_FIELDS=UV_FIELDS)
         print(f"Align results stored in <RegridObj>.aligned")
 
 #    def check_alignment(self, model: xr.DataArray, verif: xr.DataArray):

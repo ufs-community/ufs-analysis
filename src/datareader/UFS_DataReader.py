@@ -13,10 +13,10 @@ from .DataReader_Super import DataReader
 
 
 class UFS_DataReader(DataReader):
-    WINDS = [
-        {'U_WIND': 'uprs', 'V_WIND': 'vprs'},
-        {'U_WIND': 'u', 'V_WIND': 'v'},
-        {'U_WIND': 'u10m', 'V_WIND': 'v10m'}
+    UV_FIELDS = [
+        {'U_FIELD': 'uprs', 'V_FIELD': 'vprs'},
+        {'U_FIELD': 'u', 'V_FIELD': 'v'},
+        {'U_FIELD': 'u10m', 'V_FIELD': 'v10m'}
     ]
 
     '''Concrete: Reads and contains UFS datasets.'''

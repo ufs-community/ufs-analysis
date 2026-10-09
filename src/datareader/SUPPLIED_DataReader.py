@@ -29,7 +29,7 @@ class SUPPLIED_DataReader(DataReader):
             raise ValueError(msg)
 
         self._dataset = dataset
-        self.WINDS = kwargs.get('WINDS')
+        self.UV_FIELDS = kwargs.get('UV_FIELDS')
 
         super().__init__()
 

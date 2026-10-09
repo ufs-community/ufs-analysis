@@ -459,21 +459,21 @@ class DataReader(ABC):
             data = data.where(data['init.month'].isin(initmonths), drop=True)
 
         # Model-specific vertical selection
-        model_dims = self.get_vertical_dims()
+        vertical_dims = self.get_vertical_dims()
 
         lev = params['lev'] # Default None, what about ocean?
         # For UFS levels
-        if "level_dim" in model_dims and lev is not None and model_dims["level_dim"] in data.dims:
+        if "level_dim" in vertical_dims and lev is not None and vertical_dims["level_dim"] in data.dims:
             print('__level dim__')
             if isinstance(lev, (tuple, list)):
 
                 if len(lev) == 1:
-                    data = data.sel({model_dims["level_dim"]: [lev[0]]})
+                    data = data.sel({vertical_dims["level_dim"]: [lev[0]]})
                 else:
-                    data = data.sel({model_dims["level_dim"]: slice(*lev)})
+                    data = data.sel({vertical_dims["level_dim"]: slice(*lev)})
 
             else:
-                data = data.sel({model_dims["level_dim"]: [lev]})  # Do not use method=nearest
+                data = data.sel({vertical_dims["level_dim"]: [lev]})  # Do not use method=nearest
 
         # For other Vertical levels
         elif lev is not None:
@@ -505,16 +505,16 @@ class DataReader(ABC):
 
         # Depth
         depth = params['depth']
-        if "depth_dim" in model_dims and depth is not None and model_dims["depth_dim"] in data.dims:
+        if "depth_dim" in vertical_dims and depth is not None and vertical_dims["depth_dim"] in data.dims:
             # print('Slicing by depth_dim')
             if isinstance(depth, (tuple, list)):
 
                 if len(depth) == 1:
-                    data = data.sel({model_dims["depth_dim"]: [depth[0]]})
+                    data = data.sel({vertical_dims["depth_dim"]: [depth[0]]})
                 else:
-                    data = data.sel({model_dims["depth_dim"]: slice(*depth)})
+                    data = data.sel({vertical_dims["depth_dim"]: slice(*depth)})
             else:
-                data = data.sel({model_dims["depth_dim"]: [depth]})  # Do not use method=nearest
+                data = data.sel({vertical_dims["depth_dim"]: [depth]})  # Do not use method=nearest
 
         # Ensemble member and lead time
         member = params['member']
