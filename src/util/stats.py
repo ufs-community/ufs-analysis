@@ -440,19 +440,19 @@ def calc_composite_layers(data_reader,  # : DataReader_Super.DataReader,
 
         print('Calculating restoring effect (Beta star) and stationary wave number (Ks)')
 
-        # We must first check that U_WIND has been specified by the user.
-        U_WIND_FOUND = False
-        for wind_set in data_reader.WINDS:
+        # We must first check that U_FIELD has been specified by the user.
+        U_FIELD_FOUND = False
+        for wind_set in data_reader.UV_FIELDS:
 
-            if var[0] == wind_set['U_WIND']:
-                U_WIND_FOUND = True
+            if var[0] == wind_set['U_FIELD']:
+                U_FIELD_FOUND = True
                 use_this_var = var[0]
 
-            if var[1] == wind_set['U_WIND']:
-                U_WIND_FOUND = True
+            if var[1] == wind_set['U_FIELD']:
+                U_FIELD_FOUND = True
                 use_this_var = var[1]
 
-        if U_WIND_FOUND is False:
+        if U_FIELD_FOUND is False:
             msg = f'restoring effect and/or stationary wave number require U wind component, got {var}'
             raise ValueError(msg)
 

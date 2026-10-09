@@ -237,11 +237,12 @@ class DataReader(ABC):
     def get_vertical_dims(self) -> dict:
         # These are UFS models, other systems may not have definitions and that's okay.
         models = {
-            "atm": {"level_dim": "lev", "depth_dim": "depthBelowLandLayer"},
-            "ocn": {"depth_dim": "depth"},
-            "lnd": {"depth_dim": "depthBelowLandLayer"},
-            "ice": {},
-            "wav": {}
+            'atm': {'level_dim': 'lev', 'depth_dim': 'depthBelowLandLayer'},
+            'ocn': {'level_dim': 'lev',
+                    'depth_dim': ['depth', 'deptho', 'depthBelowLandLayer', 'z_l', 'z_i', 'zl', 'zi']},
+            'lnd': {'depth_dim': 'depthBelowLandLayer'},
+            'ice': {},
+            'wav': {}
         }
 
         return models.get(getattr(self, 'model', 'dummy'), {})
@@ -261,7 +262,7 @@ class DataReader(ABC):
 
         # Assume these are the possible vertical coordinates we could encounter.
         # May need to update this if new coordinates are encountered.
-        vertical_dims = {'lev', 'hybrid', 'depth', 'depthBelowLandLayer'}
+        vertical_dims = {'lev', 'hybrid', 'depth', 'deptho', 'depthBelowLandLayer', 'z_l', 'z_i', 'zl', 'zi'}
         vertical_dims_found = []
 
         # null
@@ -458,24 +459,25 @@ class DataReader(ABC):
             data = data.where(data['init.month'].isin(initmonths), drop=True)
 
         # Model-specific vertical selection
-        model_dims = self.get_vertical_dims()
+        vertical_dims = self.get_vertical_dims()
 
-        lev = params['lev']
+        lev = params['lev'] # Default None, what about ocean?
         # For UFS levels
-        if "level_dim" in model_dims and lev is not None and model_dims["level_dim"] in data.dims:
-            # print(f"Slicing by model dimension {model_dims['level_dim']}")
+        if "level_dim" in vertical_dims and lev is not None and vertical_dims["level_dim"] in data.dims:
+            print('__level dim__')
             if isinstance(lev, (tuple, list)):
 
                 if len(lev) == 1:
-                    data = data.sel({model_dims["level_dim"]: [lev[0]]})
+                    data = data.sel({vertical_dims["level_dim"]: [lev[0]]})
                 else:
-                    data = data.sel({model_dims["level_dim"]: slice(*lev)})
+                    data = data.sel({vertical_dims["level_dim"]: slice(*lev)})
 
             else:
-                data = data.sel({model_dims["level_dim"]: [lev]})  # Do not use method=nearest
+                data = data.sel({vertical_dims["level_dim"]: [lev]})  # Do not use method=nearest
 
         # For other Vertical levels
         elif lev is not None:
+            print('__lev__')
             vertical_dim = None
 
             if 'hybrid' in data.dims:  # might need to revist this
@@ -503,16 +505,16 @@ class DataReader(ABC):
 
         # Depth
         depth = params['depth']
-        if "depth_dim" in model_dims and depth is not None and model_dims["depth_dim"] in data.dims:
+        if "depth_dim" in vertical_dims and depth is not None and vertical_dims["depth_dim"] in data.dims:
             # print('Slicing by depth_dim')
             if isinstance(depth, (tuple, list)):
 
                 if len(depth) == 1:
-                    data = data.sel({model_dims["depth_dim"]: [depth[0]]})
+                    data = data.sel({vertical_dims["depth_dim"]: [depth[0]]})
                 else:
-                    data = data.sel({model_dims["depth_dim"]: slice(*depth)})
+                    data = data.sel({vertical_dims["depth_dim"]: slice(*depth)})
             else:
-                data = data.sel({model_dims["depth_dim"]: [depth]})  # Do not use method=nearest
+                data = data.sel({vertical_dims["depth_dim"]: [depth]})  # Do not use method=nearest
 
         # Ensemble member and lead time
         member = params['member']

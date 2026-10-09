@@ -14,9 +14,9 @@ from .DataReader_Super import DataReader
 
 
 class ERA5_DataReader(DataReader):
-    WINDS = [
-        {'U_WIND': 'u_component_of_wind', 'V_WIND': 'v_component_of_wind'},
-        {'U_WIND': '10m_u_component_of_wind', 'V_WIND': '10m_v_component_of_wind'}
+    UV_FIELDS = [
+        {'U_FIELD': 'u_component_of_wind', 'V_FIELD': 'v_component_of_wind'},
+        {'U_FIELD': '10m_u_component_of_wind', 'V_FIELD': '10m_v_component_of_wind'}
     ]
 
     '''Concrete: Reads and contains ERA5 datasets.'''
