@@ -21,6 +21,16 @@ pd.set_option('display.max_rows', None)
 
 class DataReader(ABC):
     '''Abstract: Reads and contains datasets for various data assimilation modeling systems.'''
+
+    VERTICAL_DIMS = {
+        'atm': {'level_dim': 'lev', 'depth_dim': 'depthBelowLandLayer'},
+        'ocn': {'level_dim': 'lev',
+                'depth_dim': ['depth', 'deptho', 'depthBelowLandLayer', 'z_l', 'z_i', 'zl', 'zi', 'z']},
+        'lnd': {'depth_dim': 'depthBelowLandLayer'},
+        'ice': {},
+        'wav': {}
+    }
+
     def __init__(self, **kwargs):
 
         file_url = kwargs.get('file_url', None)
@@ -236,23 +246,39 @@ class DataReader(ABC):
 
     def get_vertical_dims(self) -> dict:
         # These are UFS models, other systems may not have definitions and that's okay.
-        models = {
-            'atm': {'level_dim': 'lev', 'depth_dim': 'depthBelowLandLayer'},
-            'ocn': {'level_dim': 'lev',
-                    'depth_dim': ['depth', 'deptho', 'depthBelowLandLayer', 'z_l', 'z_i', 'zl', 'zi']},
-            'lnd': {'depth_dim': 'depthBelowLandLayer'},
-            'ice': {},
-            'wav': {}
-        }
+        # models = {
+        #     'atm': {'level_dim': 'lev', 'depth_dim': 'depthBelowLandLayer'},
+        #     'ocn': {'level_dim': 'lev',
+        #             'depth_dim': ['depth', 'deptho', 'depthBelowLandLayer', 'z_l', 'z_i', 'zl', 'zi', 'z']},
+        #     'lnd': {'depth_dim': 'depthBelowLandLayer'},
+        #     'ice': {},
+        #     'wav': {}
+        # }
 
-        return models.get(getattr(self, 'model', 'dummy'), {})
+        this_model_vertical_dims = self.VERTICAL_DIMS.get(getattr(self, 'model', 'dummy'), {})
+
+        return this_model_vertical_dims
+
+    def ravel_dims(self):
+        '''flatten vertical dims dictionary into a list'''
+        dims = []
+        for this_model in self.VERTICAL_DIMS:
+            for this_key in self.VERTICAL_DIMS[this_model]:
+
+                these_values = self.VERTICAL_DIMS[this_model][this_key]
+                if isinstance(these_values, list):
+                    for this_value in these_values:
+                        dims.append(this_value)
+                else:
+                    dims.append(these_values)
+
+        dims = list(set(dims))
+        return dims
 
     def is_flat(self, dataset: xr.Dataset = None) -> tuple[bool, list[str]]:
 
         '''
-        This is a rather naive way to determine if geospatial data are flat.
-        Effective usage depends on resetting/dropping coords, e.g. when 1 level is retrieved.
-        If an external Xarray dataset is supplied, then bypass this data_reader's dataset.
+        Determine if geospatial data are flat.
         '''
         if dataset is None:
             dataset = self._dataset
@@ -260,9 +286,8 @@ class DataReader(ABC):
         # All dimensions in dataset
         all_dims = set(list(dataset.dims))
 
-        # Assume these are the possible vertical coordinates we could encounter.
-        # May need to update this if new coordinates are encountered.
-        vertical_dims = {'lev', 'hybrid', 'depth', 'deptho', 'depthBelowLandLayer', 'z_l', 'z_i', 'zl', 'zi'}
+        # List of all possible vertical dimensions
+        vertical_dims = self.ravel_dims()
         vertical_dims_found = []
 
         # null
